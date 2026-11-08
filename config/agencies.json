@@ -1,0 +1,4 @@
+[
+  { "id": "hamilton-ema", "name": "Hamilton County EMA (demo)", "pubkey": "<filled by setup script>", "secretEnv": "AGENCY_HAMILTON_EMA_SECRET" },
+  { "id": "nws-cin", "name": "NWS Cincinnati (demo)", "pubkey": "<filled by setup script>", "secretEnv": "AGENCY_NWS_CIN_SECRET" }
+]
