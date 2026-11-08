@@ -23,8 +23,12 @@ export class GeminiBudgetError extends Error {
 let ai: GoogleGenAI | null = null;
 function client(): GoogleGenAI {
   if (!process.env.GEMINI_API_KEY) throw new Error("Missing GEMINI_API_KEY in .env.local");
+  // v1beta: the SDK defaults to v1, which rejects the googleSearch tool with a 400.
   // SDK retries are off (its default backoff can run for minutes); generate() owns retries.
-  ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { retryOptions: { attempts: 1 } } });
+  ai ??= new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: { apiVersion: "v1beta", retryOptions: { attempts: 1 } },
+  });
   return ai;
 }
 
