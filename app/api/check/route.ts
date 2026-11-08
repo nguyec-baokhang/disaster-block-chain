@@ -1,7 +1,10 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
+import { PublicKey } from "@solana/web3.js";
+import { getAgency } from "@/lib/agencies";
 import { GeminiBudgetError, groundedCheck, matchAgainstAlerts, transcribeVideo } from "@/lib/gemini";
 import { sha256 } from "@/lib/hash";
-import { createCheck, listAlerts } from "@/lib/store";
+import { alertPda, readAlertStatus } from "@/lib/registry";
+import { createCheck, listAlerts, saveAlert } from "@/lib/store";
 import type { Alert, CheckResult } from "@/lib/types";
 
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
@@ -85,15 +88,18 @@ async function checkContent(input: string, alerts: Alert[], deadline: number) {
   const matchedAlert = alerts.find((a) => a.id === match.matchedAlertId);
 
   if (matchedAlert && match.relation !== "UNRELATED") {
+    const live = await withLiveStatus(matchedAlert, alerts);
+    // A retracted or replaced alert is never confirmation, even if the wording matches exactly.
+    const verdict = match.relation === "SAME" && !live.outdated ? ("VERIFIED_OFFICIAL" as const) : ("CONTRADICTED" as const);
     return {
-      verdict: match.relation === "SAME" ? ("VERIFIED_OFFICIAL" as const) : ("CONTRADICTED" as const),
+      verdict,
       basis: "official_match" as const,
-      summary: match.summary,
-      matchedAlert,
+      summary: live.outdated ?? match.summary,
+      matchedAlert: live.alert,
       differences: match.differences,
       sources: [],
       redFlags: match.redFlags,
-      limitations: [MATCH_LIMITATION],
+      limitations: live.limitation ? [MATCH_LIMITATION, live.limitation] : [MATCH_LIMITATION],
     };
   }
 
@@ -106,5 +112,51 @@ async function checkContent(input: string, alerts: Alert[], deadline: number) {
     sources: grounded.sources,
     redFlags: [...new Set([...match.redFlags, ...grounded.redFlags])],
     limitations: grounded.limitations,
+  };
+}
+
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" });
+
+// Anchor alerts can be retracted or superseded after publishing, so read the status live from the
+// chain at check time (alert.registryStatus is only a cache, refreshed here).
+async function withLiveStatus(
+  alert: Alert,
+  alerts: Alert[],
+): Promise<{ alert: Alert; outdated?: string; limitation?: string }> {
+  if (alert.chainRecord !== "anchor") return { alert };
+  const agency = getAgency(alert.agencyId);
+  if (!agency) return { alert };
+  const authority = new PublicKey(agency.pubkey);
+
+  let live;
+  try {
+    live = await readAlertStatus(authority, alert.contentHash);
+  } catch (err) {
+    console.error(`registry status read failed for ${alert.id}:`, err);
+    return { alert, limitation: "Couldn't read this alert's current on-chain status, so it may since have been retracted or replaced." };
+  }
+  if (!live) return { alert, limitation: "No on-chain registry record was found for this alert." };
+
+  const current = alert.registryStatus === live.status ? alert : await saveAlert({ ...alert, registryStatus: live.status });
+  if (live.status === "Active") return { alert: current };
+
+  const when = live.statusChangedAt ? ` on ${formatDate(live.statusChangedAt)}` : "";
+  if (live.status === "Retracted") {
+    return { alert: current, outdated: `${alert.agencyName} officially retracted this alert${when}. Don't act on it.` };
+  }
+
+  const replacement = alerts.find(
+    (a) =>
+      a.chainRecord === "anchor" &&
+      a.agencyId === alert.agencyId &&
+      /^[0-9a-f]{64}$/.test(a.contentHash) &&
+      alertPda(authority, a.contentHash).toBase58() === live.supersededBy,
+  );
+  const follow = replacement
+    ? ` Follow "${replacement.title}" (${replacement.id}) instead.`
+    : " Follow the agency's current alert instead.";
+  return {
+    alert: current,
+    outdated: `${alert.agencyName} replaced this alert with a newer one${when}, so this version is outdated.${follow}`,
   };
 }

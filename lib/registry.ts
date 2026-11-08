@@ -160,3 +160,18 @@ export async function readRegistry(): Promise<{ admin: string } | null> {
   const r: OnChainRegistry | null = await getProgram().account.registry.fetchNullable(registryPda());
   return r && { admin: r.admin.toBase58() };
 }
+
+// Live status for checks. A retracted or superseded Alert PDA can't be written again, so its most
+// recent transaction is the one that changed its status; its block time is when that happened.
+export async function readAlertStatus(
+  agencyAuthority: PublicKey,
+  contentHashHex: string,
+): Promise<(RegistryAlert & { statusChangedAt: string | null }) | null> {
+  const alert = await readAlert(agencyAuthority, contentHashHex);
+  if (!alert) return null;
+  if (alert.status === "Active") return { ...alert, statusChangedAt: null };
+
+  const [latest] = await getConnection().getSignaturesForAddress(new PublicKey(alert.address), { limit: 1 });
+  const at = latest?.blockTime ? new Date(latest.blockTime * 1000).toISOString() : null;
+  return { ...alert, statusChangedAt: at };
+}
