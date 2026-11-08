@@ -4,7 +4,7 @@ Read `PLAN.md` before doing anything. It is the source of truth for scope, the A
 
 ## Context
 - 24-hour hackathon (MakeUC 2026), deadline Nov 8 11:00 AM CST. Speed and a working demo beat completeness.
-- Two devs: backend (Gemini + Solana + API routes) and frontend (pages + components). Work only in the area you are asked to.
+- Two devs pair-program on one machine: backend first, frontend after ~1:00 AM.
 - Windows / PowerShell environment. Use `npm`, `npx tsx` for scripts.
 
 ## Hard rules
@@ -19,5 +19,4 @@ Read `PLAN.md` before doing anything. It is the source of truth for scope, the A
 
 ## Workflow
 - Small, working increments. After each, run `npm run build` (or the relevant script) and fix errors before moving on.
-- Frontend uses `lib/mock.ts` until told to switch to the real API.
 - Keep components simple: Tailwind, lucide-react, no UI libraries.

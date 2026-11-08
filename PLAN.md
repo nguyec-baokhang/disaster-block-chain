@@ -3,7 +3,7 @@
 > **Did they actually say it?** Source-level provenance for emergency information.
 
 - **Deadline:** Sun Nov 8, 2026, 11:00 AM CST (Devpost **and** the judging Google Form)
-- **Team:** 2 people. Kishan = backend (Gemini + Solana + API). Teammate = frontend.
+- **Team:** 2 people pair-programming on one machine, backend first, frontend after ~1:00 AM.
 - **Prize targets:** MLH Best Use of Gemini API, MLH Best Use of Solana, Social Issues track (Security track as a bonus).
 - **Rule:** everything is written during the hackathon. The concept ("prove it's real" instead of "detect fakes") was inspired by TruChain (Badger Build Fest); no code is reused. Credit this in the Devpost writeup.
 
@@ -94,7 +94,6 @@ app/
 components/                # VerdictBadge, AlertCard, SourceList, DiffList, ExplorerLink, VerifyButton
 lib/
   types.ts                 # SHARED CONTRACT — commit first, change only together
-  mock.ts                  # mock data matching types.ts for frontend work
   gemini.ts                # transcribeVideo, matchAgainstAlerts, groundedCheck
   solana.ts                # recordMemo, readMemo, explorerUrl
   hash.ts                  # sha256, canonical alert hashing
@@ -107,7 +106,7 @@ data/.gitkeep              # data/*.json is gitignored
 
 ## 7. Shared contract — `lib/types.ts`
 
-**Write and commit this before anything else.** Frontend builds against `lib/mock.ts` until the API is ready.
+**Write and commit this before anything else.**
 
 ```ts
 export type Agency = { id: string; name: string; pubkey: string };
@@ -234,25 +233,24 @@ Pages, in build order:
 
 ## 11. Git workflow
 
-- `main` stays runnable. Branches: `backend`, `frontend`. Merge to `main` at least every ~2 hours.
-- Commit `lib/types.ts` + `lib/mock.ts` + scaffold to `main` **first**, then branch.
-- `.gitignore`: `.env.local`, `data/*.json`, `node_modules`.
-- Changing `lib/types.ts` = tell your teammate first.
+- Work directly on `main` from one laptop.
+- Push after every phase.
+- Keep `.env.local` and `data/*.json` out of git.
 
 ## 12. Timeline (CST)
 
-| Time | Kishan (backend) | Teammate (frontend) |
-|---|---|---|
-| Now → +45 min | Scaffold, `types.ts`, `mock.ts`, push. Wallet setup script, fund both wallets, Gemini key | Pull, landing + layout + VerdictBadge |
-| → ~10:30 PM | `hash.ts`, `solana.ts`, `POST/GET /api/alerts` with a real Devnet tx | /check and /result on mock data |
-| → ~12:30 AM | `gemini.ts` all three functions, `POST /api/check` | /alerts, /publish, VerifyButton |
-| → ~2:00 AM | Verify route, error handling | Swap mocks for real API |
-| **~2:00 AM milestone** | **Full flow works: publish → check (text) → verdict → verify** | |
-| → ~3:30 AM | Video path, seed demo alerts | Polish, mobile check |
-| ~3:30–7:30 AM | Sleep | Sleep |
-| 8:00–9:15 AM | Bug fixes, rehearse demo | Screenshots, final UI fixes |
-| 9:15–10:30 AM | Record demo video, Devpost text | Judging form, README |
-| 10:30–11:00 AM | **Buffer — submitted and form done by 10:45** | |
+| Phase | Work |
+|---|---|
+| 1 | Scaffold, `types.ts`, `store.ts`, wallet setup script |
+| 2 | `hash.ts`, `solana.ts`, alerts routes, verify route |
+| 3 | `gemini.ts`, check routes |
+| 4 | Integration test via PowerShell |
+| **~1:00 AM** | **Frontend cutoff — switch to frontend** |
+| 5 | /check, /result |
+| 6 | /alerts, /publish, landing |
+| 7 | Full demo run |
+| — | Sleep |
+| Morning | Demo video, Devpost, **judging form by 10:45 AM** |
 
 ## 13. Demo script (2–3 min)
 
