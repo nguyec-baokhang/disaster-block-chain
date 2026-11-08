@@ -2,13 +2,16 @@
 // Demo agency action: the server signs retract_alert with the issuing agency's keypair.
 import { connection } from "next/server";
 import { PublicKey } from "@solana/web3.js";
+import { requireAdmin } from "@/lib/admin";
 import { getAgency, getAgencyKeypair } from "@/lib/agencies";
 import { readAlert, retract } from "@/lib/registry";
 import { explorerUrl } from "@/lib/solana";
 import { getAlert, saveAlert } from "@/lib/store";
 
-export async function POST(_req: Request, ctx: RouteContext<"/api/alerts/[id]/retract">) {
+export async function POST(request: Request, ctx: RouteContext<"/api/alerts/[id]/retract">) {
   await connection();
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   const { id } = await ctx.params;
 
   const alert = await getAlert(id);

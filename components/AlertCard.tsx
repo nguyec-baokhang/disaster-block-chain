@@ -15,7 +15,8 @@ const CHAIN_STATUS: Record<Alert["chainStatus"], { label: string; icon: typeof L
   failed: { label: "Not recorded on-chain", icon: CircleX, className: "border-red-500/40 bg-red-500/10 text-red-300" },
 };
 
-export default function AlertCard({ alert, preview = true }: { alert: Alert; preview?: boolean }) {
+// `admin` shows the agency actions (retract, retry). The API routes enforce the gate regardless.
+export default function AlertCard({ alert, preview = true, admin = false }: { alert: Alert; preview?: boolean; admin?: boolean }) {
   const status = CHAIN_STATUS[alert.chainStatus];
   const StatusIcon = status.icon;
   const recorded = alert.chainStatus === "confirmed" && alert.signature;
@@ -55,7 +56,7 @@ export default function AlertCard({ alert, preview = true }: { alert: Alert; pre
         <div className="mt-4 space-y-3 border-t border-navy-700 pt-4">
           {alert.explorerUrl && <ExplorerLink url={alert.explorerUrl} />}
           <VerifyButton alertId={alert.id} />
-          {alert.chainRecord === "anchor" && registryStatus === "Active" && (
+          {admin && alert.chainRecord === "anchor" && registryStatus === "Active" && (
             <RetractButton alert={alert} onRetracted={() => setRegistryStatus("Retracted")} />
           )}
         </div>
@@ -64,7 +65,7 @@ export default function AlertCard({ alert, preview = true }: { alert: Alert; pre
           <p className="text-sm text-slate-400">
             This alert has no confirmed Solana transaction, so it can&apos;t be verified and isn&apos;t used for checks.
           </p>
-          {alert.chainStatus === "failed" && <RetryButton alertId={alert.id} />}
+          {admin && alert.chainStatus === "failed" && <RetryButton alertId={alert.id} />}
         </div>
       )}
     </article>

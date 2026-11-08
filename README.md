@@ -46,6 +46,7 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 | `REGISTRY_MODE` | `memo` (default) or `anchor`: where new alerts are recorded |
 | `REGISTRY_PROGRAM_ID` | Deployed `crisis_registry` program on Devnet |
 | `REGISTRY_ADMIN_SECRET` | Registry admin key, printed by `setup-registry.ts` (only that script uses it) |
+| `ADMIN_PASSWORD` | Password for `/admin/login`; gates `/publish` and the admin API routes (publish, retract, retry, NWS import) |
 
 ### Scripts
 

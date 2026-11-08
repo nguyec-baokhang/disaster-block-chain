@@ -66,7 +66,7 @@ export default function ImportNws() {
             )}
           </p>
           {result.imported.map((a) => (
-            <AlertCard key={a.id} alert={a} />
+            <AlertCard key={a.id} alert={a} admin />
           ))}
           {result.imported.length > 0 && (
             <Link href="/alerts" className="inline-block text-sm text-sky-300 hover:text-sky-200 hover:underline">

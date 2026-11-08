@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { LoaderCircle, Megaphone, Plus } from "lucide-react";
 import AlertCard from "@/components/AlertCard";
+import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin";
 import { listAlerts } from "@/lib/store";
 
 export default function AlertsPage() {
@@ -39,6 +41,7 @@ export default function AlertsPage() {
 async function AlertList() {
   await connection(); // reads local files — render at request time, never prerender
   const alerts = await listAlerts();
+  const admin = verifySessionToken((await cookies()).get(ADMIN_COOKIE)?.value);
 
   if (alerts.length === 0) {
     return (
@@ -56,7 +59,7 @@ async function AlertList() {
     <ul className="mt-8 space-y-4">
       {alerts.map((a) => (
         <li key={a.id}>
-          <AlertCard alert={a} />
+          <AlertCard alert={a} admin={admin} />
         </li>
       ))}
     </ul>

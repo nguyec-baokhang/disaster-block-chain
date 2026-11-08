@@ -93,7 +93,7 @@ export default function PublishForm({ agencies }: { agencies: Agency[] }) {
             ? "Published and signed on Solana."
             : "The alert was saved, but the Solana transaction failed, so it is not an official record. Check the wallet's Devnet SOL balance and try again."}
         </p>
-        <AlertCard alert={published} preview={false} />
+        <AlertCard alert={published} preview={false} admin />
         <div className="flex flex-wrap gap-3">
           <Link
             href="/alerts"
