@@ -49,6 +49,9 @@ export default function VerifyButton({ alertId }: { alertId: string }) {
 
 function VerifyOutcome({ result }: { result: VerifyResult }) {
   const intact = result.hashMatches && result.signerIsKnownAgency;
+  // No memo could be read at all: the record is missing, which isn't the same as altered.
+  const missing = result.onChainHash === null && result.signer === null;
+  const heading = intact ? "Record intact" : missing ? "No on-chain record found" : "Record altered";
   return (
     <div
       role="status"
@@ -58,10 +61,15 @@ function VerifyOutcome({ result }: { result: VerifyResult }) {
     >
       <p className={`flex items-center gap-2 font-semibold ${intact ? "text-emerald-300" : "text-red-300"}`}>
         {intact ? <CircleCheck className="h-5 w-5" aria-hidden /> : <CircleX className="h-5 w-5" aria-hidden />}
-        {intact ? "Record intact" : "Record altered"}
+        {heading}
       </p>
+      {missing && (
+        <p className="mt-1 text-red-200">
+          We couldn&apos;t read a CrisisSignal memo from this alert&apos;s transaction, so it can&apos;t be verified.
+        </p>
+      )}
       {!intact && result.hashMatches && !result.signerIsKnownAgency && (
-        <p className="mt-1 text-red-200">The on-chain signer is not the agency this alert claims to be from.</p>
+        <p className="mt-1 text-red-200">The on-chain signer doesn&apos;t match the agency named on this alert.</p>
       )}
       <dl className="mt-3 space-y-2 font-mono text-xs">
         <div>

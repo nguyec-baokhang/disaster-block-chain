@@ -1,9 +1,11 @@
 // Server-only: signs with agency keypairs. Do not import from client components.
+import type { Keypair } from "@solana/web3.js";
 import { getAgency, getAgencyKeypair } from "./agencies";
 import { contentHash } from "./hash";
 import { explorerUrl, recordMemo } from "./solana";
-import { createAlert, saveAlert } from "./store";
+import { createAlert, getAlert, saveAlert } from "./store";
 import type { Alert } from "./types";
+import { isLocallyIntact } from "./verify";
 
 export type PublishInput = {
   agencyId: string;
@@ -53,15 +55,45 @@ export async function publishAlert(input: PublishInput): Promise<Alert> {
     ...(sourceUrl && { sourceUrl }),
   }));
 
-  let alert: Alert;
+  return signAndSave(pending, keypair);
+}
+
+const retrying = new Set<string>();
+
+// Re-sends the memo for an alert whose Solana transaction failed. The stored record must be
+// unchanged since it was hashed, so a locally edited alert can never get signed.
+export async function retryAlert(id: string): Promise<Alert> {
+  const alert = await getAlert(id);
+  if (!alert) throw new PublishError(`Alert not found: ${id}`, 404);
+  if (alert.chainStatus !== "failed") throw new PublishError(`Alert ${id} is ${alert.chainStatus}, not failed`, 409);
+  if (!isLocallyIntact(alert)) throw new PublishError(`Alert ${id} was changed after it was created`, 409);
+
+  let keypair;
   try {
-    const signature = await recordMemo(keypair, `crisissignal:v1:${pending.id}:${pending.contentHash}`);
-    alert = { ...pending, signature, chainStatus: "confirmed", explorerUrl: explorerUrl(signature) };
+    keypair = getAgencyKeypair(alert.agencyId);
   } catch (err) {
-    console.error(`recordMemo failed for ${pending.id}:`, err);
-    alert = { ...pending, signature: null, chainStatus: "failed", explorerUrl: null };
+    throw new PublishError((err as Error).message, 500);
   }
 
-  await saveAlert(alert);
-  return alert;
+  // A second click while the first transaction is in flight would record a duplicate memo.
+  if (retrying.has(id)) throw new PublishError(`Alert ${id} is already being retried`, 409);
+  retrying.add(id);
+  try {
+    return await signAndSave(alert, keypair);
+  } finally {
+    retrying.delete(id);
+  }
+}
+
+// Status is "confirmed" only if sendAndConfirmTransaction succeeded; anything else is "failed".
+async function signAndSave(alert: Alert, keypair: Keypair): Promise<Alert> {
+  let saved: Alert;
+  try {
+    const signature = await recordMemo(keypair, `crisissignal:v1:${alert.id}:${alert.contentHash}`);
+    saved = { ...alert, signature, chainStatus: "confirmed", explorerUrl: explorerUrl(signature) };
+  } catch (err) {
+    console.error(`recordMemo failed for ${alert.id}:`, err);
+    saved = { ...alert, signature: null, chainStatus: "failed", explorerUrl: null };
+  }
+  return saveAlert(saved);
 }

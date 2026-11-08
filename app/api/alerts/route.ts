@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { getAgency, getAgencyKeypair } from "@/lib/agencies";
 import { transcribeVideo } from "@/lib/gemini";
 import { sha256 } from "@/lib/hash";
+import { MAX_BODY_CHARS, MAX_TITLE_CHARS } from "@/lib/limits";
 import { PublishError, publishAlert } from "@/lib/publish";
 import { listAlerts } from "@/lib/store";
 
@@ -26,6 +27,12 @@ export async function POST(request: Request) {
   const body = String(form.get("body") ?? "").trim();
   if (!agencyId || !title || !body) {
     return Response.json({ error: "agencyId, title and body are required" }, { status: 400 });
+  }
+  if (title.length > MAX_TITLE_CHARS || body.length > MAX_BODY_CHARS) {
+    return Response.json(
+      { error: `Title must be at most ${MAX_TITLE_CHARS} and body at most ${MAX_BODY_CHARS} characters` },
+      { status: 413 },
+    );
   }
 
   const videoField = form.get("video");

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleX, FileVideoCamera, LoaderCircle, Search, X } from "lucide-react";
+import { MAX_CHECK_TEXT_CHARS } from "@/lib/limits";
 
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 const STAGES = ["Checking official records…", "Searching sources…"];
@@ -10,7 +11,7 @@ const STAGE_MS = 6_000;
 
 function errorMessage(status: number, apiError?: string): string {
   if (status === 504) return "That took too long. Please try again.";
-  if (status === 413) return "That video is too large. Please use a clip under 20 MB.";
+  if (status === 413) return apiError ?? "That upload is too large.";
   return apiError ?? `Something went wrong (${status}). Please try again.`;
 }
 
@@ -88,6 +89,7 @@ export default function CheckPage() {
             onChange={(e) => setText(e.target.value)}
             disabled={loading}
             rows={8}
+            maxLength={MAX_CHECK_TEXT_CHARS}
             placeholder="e.g. URGENT: County says EVACUATE NOW, the water is poisoned!!"
             className="mt-2 w-full resize-y rounded-xl border border-navy-600 bg-navy-900 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 disabled:opacity-60"
           />

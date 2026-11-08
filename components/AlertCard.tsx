@@ -1,5 +1,6 @@
 import { CircleX, Clock, Link2 } from "lucide-react";
 import ExplorerLink from "@/components/ExplorerLink";
+import RetryButton from "@/components/RetryButton";
 import SourceUrlLink from "@/components/SourceUrlLink";
 import VerifyButton from "@/components/VerifyButton";
 import type { Alert } from "@/lib/types";
@@ -47,9 +48,12 @@ export default function AlertCard({ alert, preview = true }: { alert: Alert; pre
           <VerifyButton alertId={alert.id} />
         </div>
       ) : (
-        <p className="mt-4 border-t border-navy-700 pt-4 text-sm text-slate-400">
-          This alert has no confirmed Solana transaction, so it can&apos;t be verified and isn&apos;t used for checks.
-        </p>
+        <div className="mt-4 space-y-3 border-t border-navy-700 pt-4">
+          <p className="text-sm text-slate-400">
+            This alert has no confirmed Solana transaction, so it can&apos;t be verified and isn&apos;t used for checks.
+          </p>
+          {alert.chainStatus === "failed" && <RetryButton alertId={alert.id} />}
+        </div>
       )}
     </article>
   );

@@ -188,7 +188,7 @@ Rules:
 }
 
 // Drop any item that pastes in a whole text instead of naming the specific change.
-function shortDifferences(items: string[], fullTexts: string[]): string[] {
+export function shortDifferences(items: string[], fullTexts: string[]): string[] {
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
   const texts = fullTexts.map(norm).filter((t) => t.length > 30);
   return items.filter((item) => !texts.some((t) => norm(item).includes(t)));
@@ -256,11 +256,14 @@ Respond with ONLY a JSON object, no markdown, no other text:
     };
   }
 
-  const sources = groundingSources(res);
+  return interpretGrounded(res.text ?? "", groundingSources(res));
+}
 
+// Applies the verdict rules to the model's JSON text. Sources must come from grounding metadata.
+export function interpretGrounded(responseText: string, sources: Source[]): GroundedResult {
   let raw: Record<string, unknown>;
   try {
-    const text = (res.text ?? "").replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+    const text = responseText.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
     raw = JSON.parse(text);
   } catch {
     return {
