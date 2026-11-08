@@ -7,7 +7,7 @@
   },
   {
     "id": "nws-cin",
-    "name": "NWS Cincinnati (demo)",
+    "name": "National Weather Service (mirrored, demo)",
     "pubkey": "9kw2CaVFYdPc5ZKsuvxdVydnuXWWF1JxWunJyZaVDcai",
     "secretEnv": "AGENCY_NWS_CIN_SECRET"
   }

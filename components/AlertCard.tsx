@@ -1,5 +1,6 @@
 import { CircleX, Clock, Link2 } from "lucide-react";
 import ExplorerLink from "@/components/ExplorerLink";
+import SourceUrlLink from "@/components/SourceUrlLink";
 import VerifyButton from "@/components/VerifyButton";
 import type { Alert } from "@/lib/types";
 
@@ -34,6 +35,11 @@ export default function AlertCard({ alert, preview = true }: { alert: Alert; pre
         <span className="text-slate-600"> · </span>
         <span className="font-mono">{alert.id}</span>
       </p>
+      {alert.sourceUrl && (
+        <p className="mt-1">
+          <SourceUrlLink url={alert.sourceUrl} />
+        </p>
+      )}
 
       {recorded ? (
         <div className="mt-4 space-y-3 border-t border-navy-700 pt-4">

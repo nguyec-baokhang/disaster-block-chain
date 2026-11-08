@@ -7,6 +7,7 @@ import { Flag, Info, Link2, LoaderCircle, RotateCcw } from "lucide-react";
 import DiffList from "@/components/DiffList";
 import ExplorerLink from "@/components/ExplorerLink";
 import SourceList from "@/components/SourceList";
+import SourceUrlLink from "@/components/SourceUrlLink";
 import VerdictBadge from "@/components/VerdictBadge";
 import VerifyButton from "@/components/VerifyButton";
 import type { Alert, CheckResult } from "@/lib/types";
@@ -133,6 +134,7 @@ function OfficialPanel({ alert }: { alert: Alert }) {
           <span className="text-slate-500"> · </span>
           {new Date(alert.issuedAt).toLocaleString()}
         </p>
+        {alert.sourceUrl && <SourceUrlLink url={alert.sourceUrl} />}
         {alert.chainStatus === "confirmed" && alert.explorerUrl && (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1.5 text-emerald-300">

@@ -2,10 +2,9 @@
 import { connection } from "next/server";
 import { getAgency, getAgencyKeypair } from "@/lib/agencies";
 import { transcribeVideo } from "@/lib/gemini";
-import { contentHash, sha256 } from "@/lib/hash";
-import { explorerUrl, recordMemo } from "@/lib/solana";
-import { createAlert, listAlerts, saveAlert } from "@/lib/store";
-import type { Alert } from "@/lib/types";
+import { sha256 } from "@/lib/hash";
+import { PublishError, publishAlert } from "@/lib/publish";
+import { listAlerts } from "@/lib/store";
 
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 
@@ -38,12 +37,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Upload must be a video file" }, { status: 400 });
   }
 
-  const agency = getAgency(agencyId);
-  if (!agency) return Response.json({ error: `Unknown agency: ${agencyId}` }, { status: 400 });
-
-  let keypair;
+  // Fail fast on agency/keypair problems before spending time on transcription.
+  if (!getAgency(agencyId)) return Response.json({ error: `Unknown agency: ${agencyId}` }, { status: 400 });
   try {
-    keypair = getAgencyKeypair(agencyId);
+    getAgencyKeypair(agencyId);
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 500 });
   }
@@ -60,31 +57,11 @@ export async function POST(request: Request) {
     }
   }
 
-  const issuedAt = new Date().toISOString();
-  const pending = await createAlert((id) => ({
-    id,
-    agencyId,
-    agencyName: agency.name,
-    title,
-    body,
-    ...(transcript && { transcript }),
-    ...(mediaHash && { mediaHash }),
-    contentHash: contentHash({ agencyId, title, body, issuedAt, mediaHash }),
-    signature: null,
-    chainStatus: "pending",
-    explorerUrl: null,
-    issuedAt,
-  }));
-
-  let alert: Alert;
   try {
-    const signature = await recordMemo(keypair, `crisissignal:v1:${pending.id}:${pending.contentHash}`);
-    alert = { ...pending, signature, chainStatus: "confirmed", explorerUrl: explorerUrl(signature) };
+    const alert = await publishAlert({ agencyId, title, body, mediaHash, transcript });
+    return Response.json(alert, { status: 201 });
   } catch (err) {
-    console.error(`recordMemo failed for ${pending.id}:`, err);
-    alert = { ...pending, signature: null, chainStatus: "failed", explorerUrl: null };
+    if (err instanceof PublishError) return Response.json({ error: err.message }, { status: err.status });
+    throw err;
   }
-
-  await saveAlert(alert);
-  return Response.json(alert, { status: 201 });
 }

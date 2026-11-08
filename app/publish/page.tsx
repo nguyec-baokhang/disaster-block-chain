@@ -1,4 +1,5 @@
 import { listAgencies } from "@/lib/agencies";
+import ImportNws from "./ImportNws";
 import PublishForm from "./PublishForm";
 
 export default function PublishPage() {
@@ -10,6 +11,7 @@ export default function PublishPage() {
         The alert&apos;s fingerprint is recorded on Solana Devnet, signed by the agency&apos;s wallet.
       </p>
       <PublishForm agencies={listAgencies()} />
+      <ImportNws />
     </div>
   );
 }

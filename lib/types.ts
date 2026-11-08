@@ -13,6 +13,7 @@ export type Alert = {
   chainStatus: "confirmed" | "pending" | "failed";
   explorerUrl: string | null;
   issuedAt: string;           // ISO
+  sourceUrl?: string;         // original source, e.g. a weather.gov alert (not part of contentHash)
 };
 
 export type Verdict = "VERIFIED_OFFICIAL" | "CONTRADICTED" | "SUPPORTED" | "UNVERIFIED";
