@@ -11,6 +11,7 @@ import SourceList from "@/components/SourceList";
 import SourceUrlLink from "@/components/SourceUrlLink";
 import VerdictBadge from "@/components/VerdictBadge";
 import VerifyButton from "@/components/VerifyButton";
+import { tidyClaims } from "@/lib/claims";
 import { loadThumbnail } from "@/lib/thumbnail";
 import type { Alert, CheckResult } from "@/lib/types";
 
@@ -126,7 +127,8 @@ export default function ResultView() {
 // The source (text, link, screenshot or video), then what Gemini extracted from it: that is what was compared.
 function WhatYouSaw({ check }: { check: CheckResult }) {
   if (check.inputType === "text") return <p className="whitespace-pre-wrap text-slate-200">{check.inputText}</p>;
-  const extracted = check.extractedText ?? check.inputTranscript ?? "";
+  // Older checks stored untidied claims; transcripts are shown as-is.
+  const extracted = check.extractedText ? tidyClaims(check.extractedText) : (check.inputTranscript ?? "");
   return (
     <div className="space-y-4">
       {check.inputType === "link" && check.sourceUrl && <LinkSource url={check.sourceUrl} title={check.sourceTitle} />}

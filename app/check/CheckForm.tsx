@@ -7,7 +7,9 @@ import { IMAGE_TYPES, MAX_CHECK_TEXT_CHARS, MAX_URL_CHARS, imageError } from "@/
 import { saveThumbnail } from "@/lib/thumbnail";
 
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
-const STAGE_MS = 6_000;
+const STAGE_MS = 5_000;
+const TIMEOUT_MS = 60_000;
+const TIMEOUT_MESSAGE = "That took too long. Please try again.";
 
 type Tab = "text" | "link" | "image" | "video";
 const TABS: { id: Tab; label: string; icon: typeof Type }[] = [
@@ -16,15 +18,16 @@ const TABS: { id: Tab; label: string; icon: typeof Type }[] = [
   { id: "image", label: "Screenshot", icon: ImageIcon },
   { id: "video", label: "Video", icon: FileVideoCamera },
 ];
-const FIRST_STAGE: Record<Tab, string> = {
-  text: "Checking official records…",
-  link: "Reading the page…",
-  image: "Reading the screenshot…",
-  video: "Checking official records…",
+const CHECKING = ["Checking official records…", "Searching sources…"];
+const STAGES: Record<Tab, string[]> = {
+  text: CHECKING,
+  link: ["Reading the page…", ...CHECKING],
+  image: ["Reading the screenshot…", ...CHECKING],
+  video: ["Watching the video…", ...CHECKING],
 };
 
 function errorMessage(status: number, apiError?: string): string {
-  if (status === 504) return "That took too long. Please try again.";
+  if (status === 504) return TIMEOUT_MESSAGE;
   if (status === 413) return apiError ?? "That upload is too large.";
   return apiError ?? `Something went wrong (${status}). Please try again.`;
 }
@@ -43,15 +46,38 @@ export default function CheckForm({ loginNote }: { loginNote: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef<AbortController | null>(null);
 
-  // Advance the loading message while the request is running.
+  const stages = STAGES[tab];
+
+  // Advance the loading message while the request is running; stay on the last stage.
   useEffect(() => {
     if (!loading) return;
-    const t = setTimeout(() => setStage(1), STAGE_MS);
-    return () => clearTimeout(t);
-  }, [loading]);
+    const t = setInterval(() => setStage((s) => Math.min(s + 1, stages.length - 1)), STAGE_MS);
+    return () => clearInterval(t);
+  }, [loading, stages.length]);
 
-  const stages = [FIRST_STAGE[tab], "Searching sources…"];
+  // The button must say "Check" whenever the page is shown. Next keeps this route's state alive while
+  // you're on /result (Back or the nav link brings it back), and the browser's back-forward cache can
+  // restore a frozen page, so reset on show and on hide, and cancel any request still running.
+  useEffect(() => {
+    const reset = () => {
+      inFlight.current?.abort("reset");
+      inFlight.current = null;
+      setLoading(false);
+      setStage(0);
+      setError(null);
+    };
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) reset();
+    };
+    reset();
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      reset();
+    };
+  }, []);
 
   function pickVideo(file: File | null) {
     setError(null);
@@ -114,16 +140,28 @@ export default function CheckForm({ loginNote }: { loginNote: ReactNode }) {
     setError(null);
     setStage(0);
     setLoading(true);
+    const controller = new AbortController();
+    inFlight.current = controller;
+    const timer = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
     try {
-      const res = await fetch("/api/check", { method: "POST", body: form });
+      const res = await fetch("/api/check", { method: "POST", body: form, signal: controller.signal });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(errorMessage(res.status, data?.error));
       if (tab === "image" && image) await saveThumbnail(data.id, image);
+      if (controller.signal.aborted) return; // the page was left or reset meanwhile: don't navigate
+      // Reset before leaving so a restored /check never shows a stale spinner.
+      setLoading(false);
+      setStage(0);
       router.push(`/result/${encodeURIComponent(data.id)}`);
     } catch (err) {
-      const message = err instanceof TypeError ? "Couldn't reach the server. Please try again." : (err as Error).message;
-      setError(message);
+      if (controller.signal.reason === "reset") return; // cancelled by the page itself, not an error
       setLoading(false);
+      setStage(0);
+      if (controller.signal.reason === "timeout") setError(TIMEOUT_MESSAGE);
+      else setError(err instanceof TypeError ? "Couldn't reach the server. Please try again." : (err as Error).message);
+    } finally {
+      clearTimeout(timer);
+      if (inFlight.current === controller) inFlight.current = null;
     }
   }
 
