@@ -4,6 +4,7 @@ import path from "path";
 import { checksForUser } from "./checks";
 import { dbEnabled } from "./db";
 import { LEDGER_LIMIT, filterChecks, type LedgerFilters } from "./ledger";
+import { rankByCosine } from "./vector";
 import * as pg from "./store-pg";
 import type { Alert, CheckResult, Verdict } from "./types";
 
@@ -190,4 +191,28 @@ export function saveEmbedding(kind: EmbeddingKind, id: string, vector: number[])
 export async function getEmbedding(kind: EmbeddingKind, id: string): Promise<number[] | undefined> {
   if (dbEnabled()) return pg.getEmbedding(kind, id);
   return (await readEmbeddings())[kind === "alert" ? "alerts" : "checks"][id];
+}
+
+// Retrieval for lib/rag.ts: nearest neighbours by cosine similarity (pgvector index, or brute force in JSON).
+
+export type Similar = { id: string; similarity: number };
+
+export async function searchAlertsByVector(vector: number[], k: number, minSimilarity: number): Promise<Similar[]> {
+  if (dbEnabled()) return pg.searchByVector("alert", vector, k, minSimilarity);
+  const { alerts } = await readEmbeddings();
+  return rankByCosine(vector, Object.entries(alerts).map(([id, v]) => ({ id, vector: v })), k, minSimilarity);
+}
+
+export async function searchChecksByVector(vector: number[], k: number, minSimilarity: number): Promise<(Similar & { check: CheckResult })[]> {
+  if (dbEnabled()) return pg.searchChecksByVector(vector, k, minSimilarity);
+  const [{ checks: vectors }, checks] = await Promise.all([readEmbeddings(), readJson<CheckResult>(CHECKS_FILE)]);
+  const byId = new Map(checks.map((c) => [c.id, c]));
+  return rankByCosine(vector, Object.entries(vectors).map(([id, v]) => ({ id, vector: v })), k, minSimilarity)
+    .filter((r) => byId.has(r.id))
+    .map((r) => ({ ...r, check: byId.get(r.id)! }));
+}
+
+export async function findChecksByMediaHash(mediaHash: string): Promise<CheckResult[]> {
+  if (dbEnabled()) return pg.findChecksByMediaHash(mediaHash);
+  return (await readJson<CheckResult>(CHECKS_FILE)).filter((c) => c.mediaHash === mediaHash);
 }

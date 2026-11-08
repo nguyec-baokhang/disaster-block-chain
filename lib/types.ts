@@ -48,6 +48,9 @@ export type CheckResult = {
   mediaHash?: string;         // sha256 of the uploaded image or video bytes
   chainSignature?: string;    // Solana tx of the check-log memo (lib/check-log.ts)
   chainStatus?: "pending" | "confirmed" | "failed"; // absent = not logged (CHECKS_LOG_SECRET unset)
+  ledgerEvidence?: string[];  // ids of trusted past checks given to the matcher as context (lib/rag.ts)
+  claimId?: string;           // cluster of checks about the same claim: the first such check's id
+  seenBefore?: number;        // similar or identical past checks found, trusted or not
 };
 
 export type VerifyResult = {

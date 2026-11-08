@@ -6,6 +6,8 @@ import { getAgency } from "@/lib/agencies";
 import { anchorCheck, checkLogEnabled } from "@/lib/check-log";
 import { ownerFields, publicCheck } from "@/lib/checks";
 import { embedCheck } from "@/lib/embeddings";
+import { retrieve, type Retrieval } from "@/lib/rag";
+import { saveEmbedding } from "@/lib/store";
 import { LinkError, fetchPage, validateUrl } from "@/lib/fetch-page";
 import {
   GeminiBudgetError,
@@ -35,6 +37,10 @@ const EXTRACT_LIMITATION = "The claims were extracted by AI and may miss or misr
 const LINK_FAILED = "Couldn't read that page — paste the text instead.";
 
 type Draft = Omit<CheckResult, "id" | "createdAt">;
+
+// Per-request state. `rag` is filled by checkContent and carries the claim's vector and cluster id out
+// of the pipeline (the vector is saved separately, never inside the check's data).
+type Ctx = { alerts: Alert[]; deadline: number; mediaHash?: string; rag?: Retrieval };
 
 export async function POST(request: Request) {
   // Checking needs a login (when Auth0 is configured), and each user gets 10 checks a minute.
@@ -96,12 +102,13 @@ export async function POST(request: Request) {
   // Only alerts recorded on-chain, and not edited locally since, count as official.
   const alerts = (await listAlerts()).filter((a) => a.chainStatus === "confirmed" && isLocallyIntact(a));
 
+  const ctx: Ctx = { alerts, deadline };
   let draft: Draft;
   try {
-    if (video) draft = await checkVideo(video, alerts, deadline);
-    else if (screenshot) draft = await checkImage(screenshot.bytes, screenshot.mimeType, alerts, deadline);
-    else if (link) draft = await checkLink(link, alerts, deadline);
-    else draft = await checkText(text, alerts, deadline);
+    if (video) draft = await checkVideo(video, ctx);
+    else if (screenshot) draft = await checkImage(screenshot.bytes, screenshot.mimeType, ctx);
+    else if (link) draft = await checkLink(link, ctx);
+    else draft = await checkText(text, ctx);
   } catch (err) {
     if (err instanceof LinkError) {
       console.error("link fetch failed:", err.message, err.detail ?? "");
@@ -122,24 +129,34 @@ export async function POST(request: Request) {
     id,
     ...draft,
     ...owner,
+    claimId: ctx.rag?.claimId ?? id,
     createdAt: new Date().toISOString(),
     ...(logged ? { chainStatus: "pending" as const } : {}),
   }));
   // After the response is sent, so neither slows the check down: embed the claim, log the verdict on Solana.
-  after(() => embedCheck(check));
+  const vector = ctx.rag?.vector;
+  after(async () => {
+    // Reuse the vector retrieval already computed; embed only if retrieval didn't get one.
+    if (!vector) return void (await embedCheck(check));
+    await saveEmbedding("check", check.id, vector).catch((err) => console.error("saving check embedding failed:", err));
+  });
   if (logged) after(() => anchorCheck(check.id));
   return Response.json(publicCheck(check), { status: 201 });
 }
 
-async function checkVideo(video: File, alerts: Alert[], deadline: number): Promise<Draft> {
+async function checkVideo(video: File, ctx: Ctx): Promise<Draft> {
   const bytes = new Uint8Array(await video.arrayBuffer());
 
   // 1. Exact file match against a registered video.
   const hash = sha256(bytes);
-  const exact = alerts.find((a) => a.mediaHash === hash);
+  ctx.mediaHash = hash;
+  const exact = ctx.alerts.find((a) => a.mediaHash === hash);
   if (exact) {
-    const live = await withLiveStatus(exact, alerts);
+    // Nothing to decide, but still link earlier checks of the same file.
+    ctx.rag = await retrieve("", hash, ctx.alerts);
+    const live = await withLiveStatus(exact, ctx.alerts);
     return {
+      ...memoryFields(ctx.rag),
       inputType: "video",
       mediaHash: hash,
       verdict: live.outdated ? "CONTRADICTED" : "VERIFIED_OFFICIAL",
@@ -153,48 +170,63 @@ async function checkVideo(video: File, alerts: Alert[], deadline: number): Promi
     };
   }
 
-  const inputTranscript = await transcribeVideo(bytes, video.type || "video/mp4", deadline);
+  const inputTranscript = await transcribeVideo(bytes, video.type || "video/mp4", ctx.deadline);
   return {
     inputType: "video",
     inputTranscript,
     inputHash: sha256(inputTranscript),
     mediaHash: hash,
-    ...(await checkContent(inputTranscript, alerts, deadline)),
+    ...(await checkContent(inputTranscript, ctx)),
   };
 }
 
-async function checkText(text: string, alerts: Alert[], deadline: number): Promise<Draft> {
-  return { inputType: "text", inputText: text, inputHash: sha256(text), ...(await checkContent(text, alerts, deadline)) };
+async function checkText(text: string, ctx: Ctx): Promise<Draft> {
+  return { inputType: "text", inputText: text, inputHash: sha256(text), ...(await checkContent(text, ctx)) };
 }
 
 // Link and screenshot: Gemini extracts the claims, then the normal pipeline checks those claims.
-async function checkLink(raw: string, alerts: Alert[], deadline: number): Promise<Draft> {
+async function checkLink(raw: string, ctx: Ctx): Promise<Draft> {
   const page = await fetchPage(raw);
-  const extractedText = await extractLinkClaims(page, deadline);
+  const extractedText = await extractLinkClaims(page, ctx.deadline);
   const draft = await checkExtracted(
     { inputType: "link", extractedText, sourceUrl: page.url, sourceTitle: page.title },
-    (claims) => checkContent(claims, alerts, deadline),
+    (claims) => checkContent(claims, ctx),
   );
   return { ...draft, inputHash: sha256(extractedText), limitations: [EXTRACT_LIMITATION, ...draft.limitations] };
 }
 
-async function checkImage(bytes: Uint8Array, mimeType: string, alerts: Alert[], deadline: number): Promise<Draft> {
-  const extractedText = await extractImageClaims(bytes, mimeType, deadline);
-  const draft = await checkExtracted({ inputType: "image", extractedText }, (claims) => checkContent(claims, alerts, deadline));
+async function checkImage(bytes: Uint8Array, mimeType: string, ctx: Ctx): Promise<Draft> {
+  ctx.mediaHash = sha256(bytes);
+  const extractedText = await extractImageClaims(bytes, mimeType, ctx.deadline);
+  const draft = await checkExtracted({ inputType: "image", extractedText }, (claims) => checkContent(claims, ctx));
   return {
     ...draft,
     inputHash: sha256(extractedText),
-    mediaHash: sha256(bytes),
+    mediaHash: ctx.mediaHash,
     limitations: [EXTRACT_LIMITATION, ...draft.limitations],
   };
 }
 
-// 2. Official match, then 3. grounded fallback.
-async function checkContent(input: string, alerts: Alert[], deadline: number) {
+function memoryFields(rag: Retrieval) {
+  return {
+    ...(rag.evidence.length > 0 ? { ledgerEvidence: rag.evidence.map((e) => e.id) } : {}),
+    ...(rag.seen > 0 ? { seenBefore: rag.seen } : {}),
+  };
+}
+
+// 2. Retrieval (alerts + trusted ledger evidence), official match, then 3. grounded fallback.
+// Retrieved evidence is only context: the verdict still needs an official alert match or cited sources.
+async function checkContent(input: string, ctx: Ctx) {
+  const { alerts, deadline } = ctx;
+  const rag = await retrieve(input, ctx.mediaHash, alerts);
+  ctx.rag = rag;
+  // Retrieved alerts when retrieval found any; otherwise every official alert, as before.
+  const candidates = rag.alerts.length > 0 ? rag.alerts : alerts;
+
   let match: MatchResult;
   const fallbackLimitations: string[] = [];
   try {
-    match = await matchAgainstAlerts(input, alerts, deadline);
+    match = await matchAgainstAlerts(input, candidates, deadline, rag.evidence);
   } catch (err) {
     if (err instanceof GeminiBudgetError) throw err;
     // Don't fail the whole check: fall through to the web source check instead.
@@ -202,7 +234,7 @@ async function checkContent(input: string, alerts: Alert[], deadline: number) {
     match = { matchedAlertId: null, relation: "UNRELATED", differences: [], redFlags: [], summary: "" };
     fallbackLimitations.push("We couldn't compare this against official alerts right now.");
   }
-  const matchedAlert = alerts.find((a) => a.id === match.matchedAlertId);
+  const matchedAlert = candidates.find((a) => a.id === match.matchedAlertId);
 
   if (matchedAlert && match.relation !== "UNRELATED") {
     const live = await withLiveStatus(matchedAlert, alerts);
@@ -217,11 +249,13 @@ async function checkContent(input: string, alerts: Alert[], deadline: number) {
       sources: [],
       redFlags: match.redFlags,
       limitations: live.limitation ? [MATCH_LIMITATION, live.limitation] : [MATCH_LIMITATION],
+      ...memoryFields(rag),
     };
   }
 
   const grounded = await groundedCheck(input, deadline);
   return {
+    ...memoryFields(rag),
     verdict: grounded.verdict,
     basis: grounded.sources.length > 0 ? ("web_sources" as const) : ("none" as const),
     summary: grounded.summary,

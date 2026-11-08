@@ -2,7 +2,7 @@
 import { getPool } from "./db";
 import { toVectorLiteral } from "./vector";
 import type { LedgerFilters } from "./ledger";
-import type { CheckStats, EmbeddingKind } from "./store";
+import type { CheckStats, EmbeddingKind, Similar } from "./store";
 import type { Alert, CheckResult, Verdict } from "./types";
 
 // "AL-001" style IDs from a sequence, so concurrent requests never share one.
@@ -117,4 +117,31 @@ export async function getEmbedding(kind: EmbeddingKind, id: string): Promise<num
     [id],
   );
   return rows[0]?.embedding ? (JSON.parse(rows[0].embedding) as number[]) : undefined;
+}
+
+// Cosine distance (<=>) uses the embedding index; similarity = 1 - distance.
+export async function searchByVector(kind: EmbeddingKind, vector: number[], k: number, minSimilarity: number): Promise<Similar[]> {
+  const { rows } = await getPool().query<{ id: string; similarity: number }>(
+    `SELECT id, 1 - (embedding <=> $1::vector) AS similarity FROM ${EMBED_TABLE[kind]}
+     WHERE embedding IS NOT NULL ORDER BY embedding <=> $1::vector LIMIT $2`,
+    [toVectorLiteral(vector), k],
+  );
+  return rows.filter((r) => r.similarity >= minSimilarity);
+}
+
+export async function searchChecksByVector(vector: number[], k: number, minSimilarity: number) {
+  const { rows } = await getPool().query<{ id: string; similarity: number; data: CheckResult }>(
+    `SELECT id, data, 1 - (embedding <=> $1::vector) AS similarity FROM checks
+     WHERE embedding IS NOT NULL ORDER BY embedding <=> $1::vector LIMIT $2`,
+    [toVectorLiteral(vector), k],
+  );
+  return rows.filter((r) => r.similarity >= minSimilarity).map((r) => ({ id: r.id, similarity: r.similarity, check: r.data }));
+}
+
+export async function findChecksByMediaHash(mediaHash: string): Promise<CheckResult[]> {
+  const { rows } = await getPool().query<{ data: CheckResult }>(
+    `SELECT data FROM checks WHERE data->>'mediaHash' = $1 ORDER BY created_at DESC LIMIT 20`,
+    [mediaHash],
+  );
+  return rows.map((r) => r.data);
 }
