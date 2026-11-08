@@ -1,4 +1,14 @@
 [
-  { "id": "hamilton-ema", "name": "Hamilton County EMA (demo)", "pubkey": "<filled by setup script>", "secretEnv": "AGENCY_HAMILTON_EMA_SECRET" },
-  { "id": "nws-cin", "name": "NWS Cincinnati (demo)", "pubkey": "<filled by setup script>", "secretEnv": "AGENCY_NWS_CIN_SECRET" }
+  {
+    "id": "hamilton-ema",
+    "name": "Hamilton County EMA (demo)",
+    "pubkey": "F5eYME9PygtFAJ1trPxRkvCLxEHx7ZnKpVMwtsMKhH1i",
+    "secretEnv": "AGENCY_HAMILTON_EMA_SECRET"
+  },
+  {
+    "id": "nws-cin",
+    "name": "NWS Cincinnati (demo)",
+    "pubkey": "9kw2CaVFYdPc5ZKsuvxdVydnuXWWF1JxWunJyZaVDcai",
+    "secretEnv": "AGENCY_NWS_CIN_SECRET"
+  }
 ]
