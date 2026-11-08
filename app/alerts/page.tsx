@@ -11,7 +11,7 @@ export default function AlertsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">Official alerts</h1>
-          <p className="mt-2 text-slate-300">Alerts published by agencies and signed on Solana Devnet.</p>
+          <p className="mt-2 text-slate-300">Official alerts mirrored from public feeds and anchored on Solana Devnet.</p>
         </div>
         <Link
           href="/publish"

@@ -4,18 +4,18 @@ import { ArrowRight, Link2, Megaphone, Search } from "lucide-react";
 const STEPS = [
   {
     icon: Megaphone,
-    title: "Agencies publish",
-    text: "An emergency agency issues an alert through CrisisSignal.",
+    title: "We mirror official alerts",
+    text: "Alerts from official feeds like weather.gov are copied into CrisisSignal as they are issued.",
   },
   {
     icon: Link2,
-    title: "Signed on Solana",
-    text: "A fingerprint of the alert is recorded on-chain, signed by the agency's own wallet.",
+    title: "Fingerprinted on Solana",
+    text: "A fingerprint of each alert is recorded on Solana, so it can't be quietly changed later.",
   },
   {
     icon: Search,
-    title: "Public checks",
-    text: "Anyone can paste a message or upload a clip to see if the agency really said it.",
+    title: "You check anything you receive",
+    text: "Paste a message or article text, or upload a video, to see if it matches what was actually said.",
   },
 ];
 
@@ -27,8 +27,9 @@ export default function Home() {
           Did they actually say it?
         </h1>
         <p className="mt-4 text-lg text-slate-300">
-          During a crisis, fake and twisted alerts spread fast. CrisisSignal checks a message against what the
-          responsible agency actually published.
+          People see screenshots and forwards, not the original alert. CrisisSignal mirrors official feeds like
+          weather.gov, anchors each alert on Solana, and lets anyone check a message, article text or video against
+          what was actually said.
         </p>
         <Link
           href="/check"

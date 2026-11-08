@@ -32,7 +32,7 @@ export default function ImportNws() {
   const failed = result?.imported.filter((a) => a.chainStatus !== "confirmed").length ?? 0;
 
   return (
-    <section className="mt-12 rounded-xl border border-navy-700 bg-navy-900 p-5">
+    <section className="mt-8 rounded-xl border border-navy-700 bg-navy-900 p-5">
       <h2 className="font-medium text-slate-50">Import live NWS alerts</h2>
       <p className="mt-1 text-sm text-slate-300">
         Pulls up to 3 active alerts from weather.gov for Ohio (Hamilton County first) and signs each with the
