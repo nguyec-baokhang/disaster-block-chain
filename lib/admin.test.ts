@@ -65,6 +65,10 @@ test("admin gate", async (t) => {
     { name: "/publish: valid cookie → passes through", cookie: valid, wantLocation: null },
     { name: "/publish: forged Auth0-looking cookie → redirect", cookie: "__session=forged", wantLocation: "http://localhost/admin/login" },
   ];
+  await t.test("/my-checks without Auth0 → rewritten to a 404 path", async () => {
+    const res = await proxy(new NextRequest("http://localhost/my-checks"));
+    assert.equal(res.headers.get("x-middleware-rewrite"), "http://localhost/_my-checks-disabled");
+  });
   await t.test("public routes pass through without a cookie", async () => {
     const res = await proxy(new NextRequest("http://localhost/alerts"));
     assert.equal(res.headers.get("location"), null);

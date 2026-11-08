@@ -39,6 +39,8 @@ export type CheckResult = {
   redFlags: string[];
   limitations: string[];
   createdAt: string;
+  userId?: string;            // Auth0 sub of the logged-in user who ran it; absent = anonymous
+  userEmail?: string;         // private: stripped from public responses (lib/checks.ts)
 };
 
 export type VerifyResult = {

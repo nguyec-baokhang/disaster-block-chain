@@ -1,6 +1,7 @@
 // Server-only: uses the filesystem, or Postgres when DATABASE_URL is set. Do not import from client components.
 import { promises as fs } from "fs";
 import path from "path";
+import { checksForUser } from "./checks";
 import { dbEnabled } from "./db";
 import * as pg from "./store-pg";
 import type { Alert, CheckResult, Verdict } from "./types";
@@ -85,6 +86,13 @@ export function saveAlert(alert: Alert): Promise<Alert> {
 export async function getCheck(id: string): Promise<CheckResult | undefined> {
   if (dbEnabled()) return pg.getCheck(id);
   return (await readJson<CheckResult>(CHECKS_FILE)).find((c) => c.id === id);
+}
+
+// A logged-in user's own checks, newest first.
+export async function listChecksByUser(userId: string): Promise<CheckResult[]> {
+  if (!userId) return [];
+  if (dbEnabled()) return pg.listChecksByUser(userId);
+  return checksForUser(await readJson<CheckResult>(CHECKS_FILE), userId);
 }
 
 // Assigns the next ID and saves in one locked step.

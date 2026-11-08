@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS checks (
 );
 SELECT create_hypertable('checks', by_range('created_at'), if_not_exists => TRUE);
 CREATE INDEX IF NOT EXISTS checks_id_idx ON checks (id);
+CREATE INDEX IF NOT EXISTS checks_user_idx ON checks ((data->>'userId'), created_at DESC);
 
 CREATE SEQUENCE IF NOT EXISTS alert_id_seq;
 CREATE SEQUENCE IF NOT EXISTS check_id_seq;

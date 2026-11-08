@@ -25,8 +25,17 @@ const VERDICTS: Record<Verdict, { label: string; icon: LucideIcon; className: st
   },
 };
 
-export default function VerdictBadge({ verdict }: { verdict: Verdict }) {
+// `compact` is a small pill for lists; the default is the large result-page badge.
+export default function VerdictBadge({ verdict, compact = false }: { verdict: Verdict; compact?: boolean }) {
   const { label, icon: Icon, className, note } = VERDICTS[verdict];
+  if (compact) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${className}`}>
+        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        {label}
+      </span>
+    );
+  }
   return (
     <div className={`inline-flex flex-col gap-1 rounded-xl border px-4 py-3 ${className}`}>
       <span className="flex items-center gap-2 text-lg font-semibold">

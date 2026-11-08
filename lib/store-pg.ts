@@ -42,6 +42,14 @@ export async function getCheck(id: string): Promise<CheckResult | undefined> {
   return rows[0]?.data;
 }
 
+export async function listChecksByUser(userId: string): Promise<CheckResult[]> {
+  const { rows } = await getPool().query<{ data: CheckResult }>(
+    `SELECT data FROM checks WHERE data->>'userId' = $1 ORDER BY created_at DESC`,
+    [userId],
+  );
+  return rows.map((r) => r.data);
+}
+
 export async function createCheck(make: (id: string) => CheckResult): Promise<CheckResult> {
   const check = make(await nextId("CK", "check_id_seq"));
   await getPool().query(`INSERT INTO checks (id, data, verdict, created_at) VALUES ($1, $2, $3, $4)`, [

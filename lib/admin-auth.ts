@@ -6,7 +6,7 @@ import { ADMIN_COOKIE, isAdminRequest, verifySessionToken } from "./admin";
 import { auth0 } from "./auth0";
 
 export type Admin = { method: "auth0"; email: string } | { method: "password" };
-export type Auth0User = { email?: string; email_verified?: boolean };
+export type Auth0User = { sub?: string; email?: string; email_verified?: boolean };
 
 export function adminEmails(raw = process.env.ADMIN_EMAILS ?? ""): string[] {
   return raw

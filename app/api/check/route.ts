@@ -1,6 +1,8 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
 import { PublicKey } from "@solana/web3.js";
+import { getAuth0User } from "@/lib/admin-auth";
 import { getAgency } from "@/lib/agencies";
+import { ownerFields, publicCheck } from "@/lib/checks";
 import {
   GeminiBudgetError,
   groundedCheck,
@@ -61,8 +63,10 @@ export async function POST(request: Request) {
     return Response.json({ error: `Check failed: ${(err as Error).message}` }, { status: 502 });
   }
 
-  const check = await createCheck((id) => ({ id, ...draft, createdAt: new Date().toISOString() }));
-  return Response.json(check, { status: 201 });
+  // Login is optional: anonymous checks simply have no owner.
+  const owner = ownerFields(await getAuth0User());
+  const check = await createCheck((id) => ({ id, ...draft, ...owner, createdAt: new Date().toISOString() }));
+  return Response.json(publicCheck(check), { status: 201 });
 }
 
 async function checkVideo(video: File, alerts: Alert[], deadline: number): Promise<Draft> {
