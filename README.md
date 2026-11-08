@@ -48,6 +48,7 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 | `REGISTRY_ADMIN_SECRET` | Registry admin key, printed by `setup-registry.ts` (only that script uses it) |
 | `DATABASE_URL` | Optional Tiger Data (Postgres + TimescaleDB) connection string, SSL required. Unset = JSON files in `data/`. Run `setup-db.ts` once after setting it |
 | `DATABASE_CA_CERT` | Path to Tiger Data's CA certificate (PEM, from the Tiger console). Needed because Tiger signs with its own CA and the app always verifies the cert |
+| `CHECKS_LOG_SECRET` | Optional base58 Devnet secret key. When set, every check's verdict is logged on Solana as a hash-only memo `crisissignal:check:v1:<checkId>:<sha256>` (no text, media or user info). Fund it at faucet.solana.com |
 | `ADMIN_PASSWORD` | Password for `/admin/login`; gates `/publish` and the admin API routes (publish, retract, retry, NWS import) |
 | `AUTH0_DOMAIN` | Optional. Turns on Auth0: "Log in" / "Sign up" in the navbar for everyone (saves check history to `/my-checks`) and "Log in with Auth0" on `/admin/login`. Login is never required for public pages. Unset = no user accounts, admin password only |
 | `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` | Auth0 Regular Web Application credentials |
@@ -98,7 +99,8 @@ demo/           demo inputs, see demo/README.md
 | POST | `/api/alerts/[id]/retract` | Agency retracts an Anchor-registry alert (demo: server signs with the agency key) |
 | GET | `/api/alerts/[id]/verify` | Integrity check against the chain |
 | POST | `/api/check` | Requires an Auth0 login when Auth0 is configured (401 otherwise); 10 checks per user per minute (429). Check one input (multipart: `text`, `url`, `image` or `video`). Links are fetched SSRF-safe (public IPs only, 10 s, 2 MB, 3 redirects); for links and screenshots Gemini extracts the claims and those are what get checked |
-| GET | `/api/checks/[id]` | One check result |
+| GET | `/api/checks/[id]` | One check result (owner removed, pasted emails/phone numbers redacted) |
+| GET | `/api/checks/[id]/verify` | Re-hash the stored check and compare with its on-chain log memo |
 | POST | `/api/nws/import` | Import live NWS alerts |
 | GET | `/api/stats` | Check totals per verdict, plus hourly counts per verdict over the last 24h (`time_bucket()` on Tiger Data) |
 

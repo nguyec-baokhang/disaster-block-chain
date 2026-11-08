@@ -54,6 +54,12 @@ export async function listChecks(filters: LedgerFilters, limit: number): Promise
   return rows.map((r) => r.data);
 }
 
+export async function saveCheck(check: CheckResult): Promise<CheckResult> {
+  const res = await getPool().query(`UPDATE checks SET data = $2, verdict = $3 WHERE id = $1`, [check.id, check, check.verdict]);
+  if (res.rowCount === 0) throw new Error(`Check not found: ${check.id}`);
+  return check;
+}
+
 export async function listChecksByUser(userId: string): Promise<CheckResult[]> {
   const { rows } = await getPool().query<{ data: CheckResult }>(
     `SELECT data FROM checks WHERE data->>'userId' = $1 ORDER BY created_at DESC`,

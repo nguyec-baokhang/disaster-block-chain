@@ -69,3 +69,24 @@ test("publicCheck strips the owner and keeps everything else", () => {
   assert.deepEqual(out, check("CK-001", "2026-11-08T01:00:00.000Z"));
   assert.equal(owned.userId, ALICE, "does not mutate the stored check");
 });
+
+test("publicCheck redacts contact details on the result page and in /api/checks/[id]", async (t) => {
+  const stored = check("CK-010", "2026-11-08T05:00:00.000Z", {
+    userId: ALICE,
+    userEmail: "alice@example.com",
+    inputText: "From bob@gmail.com: evacuate now, call (513) 555-0142",
+    inputTranscript: "Text 513-555-0199 for updates",
+    extractedText: "- Contact ops@county.gov for water.",
+  });
+  const out = publicCheck(stored);
+
+  await t.test("input text", () => assert.equal(out.inputText, "From [email]: evacuate now, call [phone]"));
+  await t.test("transcript", () => assert.equal(out.inputTranscript, "Text [phone] for updates"));
+  await t.test("extracted claims", () => assert.equal(out.extractedText, "- Contact [email] for water."));
+  await t.test("no email-like string anywhere in the response", () =>
+    assert.equal(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(JSON.stringify(out)), false));
+  await t.test("the stored check is untouched (the on-chain log hashes it)", () => {
+    assert.equal(stored.inputText, "From bob@gmail.com: evacuate now, call (513) 555-0142");
+    assert.equal(stored.userEmail, "alice@example.com");
+  });
+});

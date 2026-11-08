@@ -40,6 +40,4 @@ export async function readMemo(signature: string): Promise<{ memo: string; signe
   return { memo: memoIx.parsed, signer: signer.pubkey.toBase58() };
 }
 
-export function explorerUrl(signature: string): string {
-  return `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
-}
+export { explorerUrl } from "./explorer";

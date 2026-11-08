@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { ChevronRight, FileVideoCamera, ImageIcon, Link as LinkIcon, LoaderCircle, ScrollText, Type } from "lucide-react";
+import CheckChainLog from "@/components/CheckChainLog";
 import VerdictBadge from "@/components/VerdictBadge";
 import { LEDGER_LIMIT, LEDGER_TYPES, LEDGER_VERDICTS, parseLedgerFilters, toLedgerEntry, type LedgerFilters } from "@/lib/ledger";
 import { listChecks } from "@/lib/store";
@@ -64,10 +65,10 @@ async function Ledger({ searchParams }: { searchParams: PageProps<"/ledger">["se
           {entries.map((e) => {
             const { label, icon: Icon } = TYPE[e.inputType];
             return (
-              <li key={e.id}>
+              <li key={e.id} className="rounded-xl border border-navy-700 bg-navy-900 hover:border-navy-600">
                 <Link
                   href={`/result/${encodeURIComponent(e.id)}`}
-                  className="flex items-center gap-4 rounded-xl border border-navy-700 bg-navy-900 p-4 hover:border-navy-600 hover:bg-navy-800"
+                  className="flex items-center gap-4 rounded-xl p-4 hover:bg-navy-800"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
@@ -85,6 +86,11 @@ async function Ledger({ searchParams }: { searchParams: PageProps<"/ledger">["se
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
                 </Link>
+                {e.chainStatus === "confirmed" && (
+                  <div className="border-t border-navy-700 px-4 py-3">
+                    <CheckChainLog id={e.id} chainStatus={e.chainStatus} chainSignature={e.chainSignature} />
+                  </div>
+                )}
               </li>
             );
           })}

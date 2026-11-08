@@ -44,6 +44,10 @@ export type CheckResult = {
   createdAt: string;
   userId?: string;            // Auth0 sub of the logged-in user who ran it; absent = anonymous
   userEmail?: string;         // private: stripped from public responses (lib/checks.ts)
+  inputHash?: string;         // sha256 of the text that was compared (input text, extracted claims or transcript)
+  mediaHash?: string;         // sha256 of the uploaded image or video bytes
+  chainSignature?: string;    // Solana tx of the check-log memo (lib/check-log.ts)
+  chainStatus?: "pending" | "confirmed" | "failed"; // absent = not logged (CHECKS_LOG_SECRET unset)
 };
 
 export type VerifyResult = {

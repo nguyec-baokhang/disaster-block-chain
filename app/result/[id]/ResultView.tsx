@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FileVideoCamera, Flag, ImageIcon, Info, Link2, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
+import CheckChainLog from "@/components/CheckChainLog";
 import DiffList from "@/components/DiffList";
 import ExplorerLink from "@/components/ExplorerLink";
 import RegistryStatusBadge from "@/components/RegistryStatusBadge";
@@ -37,6 +38,23 @@ export default function ResultView() {
     };
   }, [id]);
 
+  // The Solana log is written just after the check is saved: refresh a few times until it settles.
+  const pending = state.status === "done" && state.check.chainStatus === "pending";
+  useEffect(() => {
+    if (!pending) return;
+    let tries = 0;
+    const t = setInterval(async () => {
+      if (++tries > 15) return clearInterval(t);
+      const res = await fetch(`/api/checks/${encodeURIComponent(id)}`, { cache: "no-store" }).catch(() => null);
+      const data = (await res?.json().catch(() => null)) as CheckResult | null;
+      if (res?.ok && data && data.chainStatus !== "pending") {
+        clearInterval(t);
+        setState({ status: "done", check: data });
+      }
+    }, 3000);
+    return () => clearInterval(t);
+  }, [id, pending]);
+
   if (state.status === "loading") {
     return (
       <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-14 text-slate-300">
@@ -64,6 +82,7 @@ export default function ResultView() {
       <section className="space-y-4">
         <VerdictBadge verdict={check.verdict} />
         {check.summary && <p className="max-w-3xl text-lg text-slate-200">{check.summary}</p>}
+        <CheckChainLog id={check.id} chainStatus={check.chainStatus} chainSignature={check.chainSignature} />
       </section>
 
       {check.matchedAlert ? (

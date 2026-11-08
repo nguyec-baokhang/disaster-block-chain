@@ -1,6 +1,7 @@
 // The public fake-claim ledger. Entries are a narrow public projection of a check: never the owner's
 // user id or email, and contact details people pasted into their own messages are redacted.
 import { tidyClaims } from "./claims";
+import { redact } from "./redact";
 import type { CheckResult, Verdict } from "./types";
 
 export const LEDGER_VERDICTS: Verdict[] = ["CONTRADICTED", "UNVERIFIED", "SUPPORTED", "VERIFIED_OFFICIAL"];
@@ -14,6 +15,8 @@ export type LedgerEntry = {
   inputType: CheckResult["inputType"];
   preview: string;
   createdAt: string;
+  chainStatus?: CheckResult["chainStatus"];
+  chainSignature?: string; // public tx id of the hash-only log memo
 };
 
 export type LedgerFilters = { verdict?: Verdict; type?: CheckResult["inputType"] };
@@ -26,12 +29,7 @@ export function parseLedgerFilters(params: { verdict?: string | string[]; type?:
   return { ...(verdict ? { verdict } : {}), ...(type ? { type } : {}) };
 }
 
-const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const PHONE = /(?<![\w/])(?:\+?\d{1,3}[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\w/])/g;
-
-export function redact(text: string): string {
-  return text.replace(EMAIL, "[email]").replace(PHONE, "[phone]");
-}
+export { redact };
 
 function hostOf(url?: string): string {
   try {
@@ -60,7 +58,10 @@ function previewOf(c: CheckResult): string {
 }
 
 export function toLedgerEntry(c: CheckResult): LedgerEntry {
-  return { id: c.id, verdict: c.verdict, inputType: c.inputType, preview: previewOf(c), createdAt: c.createdAt };
+  const entry: LedgerEntry = { id: c.id, verdict: c.verdict, inputType: c.inputType, preview: previewOf(c), createdAt: c.createdAt };
+  if (c.chainStatus) entry.chainStatus = c.chainStatus;
+  if (c.chainStatus === "confirmed" && c.chainSignature) entry.chainSignature = c.chainSignature;
+  return entry;
 }
 
 // JSON-store version of the Postgres query in store-pg.ts.

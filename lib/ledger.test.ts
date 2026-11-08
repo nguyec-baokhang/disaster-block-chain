@@ -46,7 +46,7 @@ test("ledger entries never expose emails or user ids", async (t) => {
   for (const c of checks) {
     await t.test(`${c.id} (${c.inputType})`, () => {
       const entry = toLedgerEntry(c);
-      assert.deepEqual(Object.keys(entry).sort(), ["createdAt", "id", "inputType", "preview", "verdict"]);
+      assert.deepEqual(Object.keys(entry).sort(), ["createdAt", "id", "inputType", "preview", "verdict"]); // no owner fields
       const json = JSON.stringify(entry);
       assert.equal(EMAILISH.test(json), false, `no email in ${json}`);
       assert.equal(json.includes(OWNER.userId), false);

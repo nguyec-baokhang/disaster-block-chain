@@ -102,6 +102,19 @@ export async function listChecksByUser(userId: string): Promise<CheckResult[]> {
   return checksForUser(await readJson<CheckResult>(CHECKS_FILE), userId);
 }
 
+// Updates a stored check (the on-chain log fills in chainSignature/chainStatus after the fact).
+export function saveCheck(check: CheckResult): Promise<CheckResult> {
+  if (dbEnabled()) return pg.saveCheck(check);
+  return locked(async () => {
+    const checks = await readJson<CheckResult>(CHECKS_FILE);
+    const i = checks.findIndex((c) => c.id === check.id);
+    if (i < 0) throw new Error(`Check not found: ${check.id}`);
+    checks[i] = check;
+    await writeJson(CHECKS_FILE, checks);
+    return check;
+  });
+}
+
 // Assigns the next ID and saves in one locked step.
 export function createCheck(make: (id: string) => CheckResult): Promise<CheckResult> {
   if (dbEnabled()) return pg.createCheck(make);

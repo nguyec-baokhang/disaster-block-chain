@@ -1,7 +1,9 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
+import { after } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { getAuth0User } from "@/lib/admin-auth";
 import { getAgency } from "@/lib/agencies";
+import { anchorCheck, checkLogEnabled } from "@/lib/check-log";
 import { ownerFields, publicCheck } from "@/lib/checks";
 import { LinkError, fetchPage, validateUrl } from "@/lib/fetch-page";
 import {
@@ -114,7 +116,16 @@ export async function POST(request: Request) {
 
   // Anonymous only when Auth0 isn't configured at all.
   const owner = ownerFields(user);
-  const check = await createCheck((id) => ({ id, ...draft, ...owner, createdAt: new Date().toISOString() }));
+  const logged = checkLogEnabled();
+  const check = await createCheck((id) => ({
+    id,
+    ...draft,
+    ...owner,
+    createdAt: new Date().toISOString(),
+    ...(logged ? { chainStatus: "pending" as const } : {}),
+  }));
+  // Log the verdict on Solana after the response is sent, so it never slows the check down.
+  if (logged) after(() => anchorCheck(check.id));
   return Response.json(publicCheck(check), { status: 201 });
 }
 
@@ -128,6 +139,7 @@ async function checkVideo(video: File, alerts: Alert[], deadline: number): Promi
     const live = await withLiveStatus(exact, alerts);
     return {
       inputType: "video",
+      mediaHash: hash,
       verdict: live.outdated ? "CONTRADICTED" : "VERIFIED_OFFICIAL",
       basis: "exact_hash",
       summary: live.outdated ?? `This is the exact video file ${exact.agencyName} published with "${exact.title}".`,
@@ -140,11 +152,17 @@ async function checkVideo(video: File, alerts: Alert[], deadline: number): Promi
   }
 
   const inputTranscript = await transcribeVideo(bytes, video.type || "video/mp4", deadline);
-  return { inputType: "video", inputTranscript, ...(await checkContent(inputTranscript, alerts, deadline)) };
+  return {
+    inputType: "video",
+    inputTranscript,
+    inputHash: sha256(inputTranscript),
+    mediaHash: hash,
+    ...(await checkContent(inputTranscript, alerts, deadline)),
+  };
 }
 
 async function checkText(text: string, alerts: Alert[], deadline: number): Promise<Draft> {
-  return { inputType: "text", inputText: text, ...(await checkContent(text, alerts, deadline)) };
+  return { inputType: "text", inputText: text, inputHash: sha256(text), ...(await checkContent(text, alerts, deadline)) };
 }
 
 // Link and screenshot: Gemini extracts the claims, then the normal pipeline checks those claims.
@@ -155,13 +173,18 @@ async function checkLink(raw: string, alerts: Alert[], deadline: number): Promis
     { inputType: "link", extractedText, sourceUrl: page.url, sourceTitle: page.title },
     (claims) => checkContent(claims, alerts, deadline),
   );
-  return { ...draft, limitations: [EXTRACT_LIMITATION, ...draft.limitations] };
+  return { ...draft, inputHash: sha256(extractedText), limitations: [EXTRACT_LIMITATION, ...draft.limitations] };
 }
 
 async function checkImage(bytes: Uint8Array, mimeType: string, alerts: Alert[], deadline: number): Promise<Draft> {
   const extractedText = await extractImageClaims(bytes, mimeType, deadline);
   const draft = await checkExtracted({ inputType: "image", extractedText }, (claims) => checkContent(claims, alerts, deadline));
-  return { ...draft, limitations: [EXTRACT_LIMITATION, ...draft.limitations] };
+  return {
+    ...draft,
+    inputHash: sha256(extractedText),
+    mediaHash: sha256(bytes),
+    limitations: [EXTRACT_LIMITATION, ...draft.limitations],
+  };
 }
 
 // 2. Official match, then 3. grounded fallback.
