@@ -1,11 +1,19 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
 import { PublicKey } from "@solana/web3.js";
 import { getAgency } from "@/lib/agencies";
-import { GeminiBudgetError, groundedCheck, matchAgainstAlerts, transcribeVideo } from "@/lib/gemini";
+import {
+  GeminiBudgetError,
+  groundedCheck,
+  matchAgainstAlerts,
+  transcribeVideo,
+  type MatchResult,
+} from "@/lib/gemini";
 import { sha256 } from "@/lib/hash";
+import { MAX_CHECK_TEXT_CHARS } from "@/lib/limits";
 import { alertPda, readAlertStatus } from "@/lib/registry";
 import { createCheck, listAlerts, saveAlert } from "@/lib/store";
 import type { Alert, CheckResult } from "@/lib/types";
+import { isLocallyIntact } from "@/lib/verify";
 
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 // Total time for the whole request; each Gemini call gets whatever is left.
@@ -29,6 +37,9 @@ export async function POST(request: Request) {
   if (!!text === !!video) {
     return Response.json({ error: "Send exactly one of text or video" }, { status: 400 });
   }
+  if (text.length > MAX_CHECK_TEXT_CHARS) {
+    return Response.json({ error: `Text must be at most ${MAX_CHECK_TEXT_CHARS} characters` }, { status: 413 });
+  }
   if (video && video.size > MAX_VIDEO_BYTES) {
     return Response.json({ error: "Video must be under 20 MB" }, { status: 413 });
   }
@@ -36,8 +47,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Upload must be a video file" }, { status: 400 });
   }
 
-  // Only alerts actually recorded on-chain count as official.
-  const alerts = (await listAlerts()).filter((a) => a.chainStatus === "confirmed");
+  // Only alerts recorded on-chain, and not edited locally since, count as official.
+  const alerts = (await listAlerts()).filter((a) => a.chainStatus === "confirmed" && isLocallyIntact(a));
 
   let draft: Draft;
   try {
@@ -61,16 +72,17 @@ async function checkVideo(video: File, alerts: Alert[], deadline: number): Promi
   const hash = sha256(bytes);
   const exact = alerts.find((a) => a.mediaHash === hash);
   if (exact) {
+    const live = await withLiveStatus(exact, alerts);
     return {
       inputType: "video",
-      verdict: "VERIFIED_OFFICIAL",
+      verdict: live.outdated ? "CONTRADICTED" : "VERIFIED_OFFICIAL",
       basis: "exact_hash",
-      summary: `This is the exact video file ${exact.agencyName} published with "${exact.title}".`,
-      matchedAlert: exact,
+      summary: live.outdated ?? `This is the exact video file ${exact.agencyName} published with "${exact.title}".`,
+      matchedAlert: live.alert,
       differences: [],
       sources: [],
       redFlags: [],
-      limitations: [],
+      limitations: live.limitation ? [live.limitation] : [],
     };
   }
 
@@ -84,7 +96,17 @@ async function checkText(text: string, alerts: Alert[], deadline: number): Promi
 
 // 2. Official match, then 3. grounded fallback.
 async function checkContent(input: string, alerts: Alert[], deadline: number) {
-  const match = await matchAgainstAlerts(input, alerts, deadline);
+  let match: MatchResult;
+  const fallbackLimitations: string[] = [];
+  try {
+    match = await matchAgainstAlerts(input, alerts, deadline);
+  } catch (err) {
+    if (err instanceof GeminiBudgetError) throw err;
+    // Don't fail the whole check: fall through to the web source check instead.
+    console.error("matchAgainstAlerts failed:", err);
+    match = { matchedAlertId: null, relation: "UNRELATED", differences: [], redFlags: [], summary: "" };
+    fallbackLimitations.push("We couldn't compare this against official alerts right now.");
+  }
   const matchedAlert = alerts.find((a) => a.id === match.matchedAlertId);
 
   if (matchedAlert && match.relation !== "UNRELATED") {
@@ -111,7 +133,7 @@ async function checkContent(input: string, alerts: Alert[], deadline: number) {
     differences: [],
     sources: grounded.sources,
     redFlags: [...new Set([...match.redFlags, ...grounded.redFlags])],
-    limitations: grounded.limitations,
+    limitations: [...fallbackLimitations, ...grounded.limitations],
   };
 }
 

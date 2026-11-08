@@ -165,6 +165,7 @@ export type VerifyResult = {
 | GET | `/api/alerts` | – | `Alert[]` newest first |
 | POST | `/api/alerts` | multipart: `agencyId`, `title`, `body`, optional `video` | `Alert` |
 | GET | `/api/alerts/[id]/verify` | – | `VerifyResult` |
+| POST | `/api/alerts/[id]/retry` | – | `Alert` (re-sends the memo for a `failed` alert; refuses locally edited alerts) |
 | POST | `/api/check` | multipart: `text` OR `video` | `CheckResult` |
 | GET | `/api/checks/[id]` | – | `CheckResult` |
 

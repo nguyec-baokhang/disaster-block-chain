@@ -31,7 +31,8 @@ export async function POST(_req: Request, ctx: RouteContext<"/api/alerts/[id]/re
   try {
     onChain = await readAlert(new PublicKey(agency.pubkey), alert.contentHash);
   } catch (err) {
-    return Response.json({ error: `Could not read registry: ${(err as Error).message}` }, { status: 502 });
+    console.error(`registry read failed for ${alert.id}:`, err);
+    return Response.json({ error: "Could not read the registry from Solana. Please try again." }, { status: 502 });
   }
   if (!onChain) return Response.json({ error: "No on-chain record for this alert" }, { status: 409 });
   if (onChain.status !== "Active") {
@@ -44,7 +45,7 @@ export async function POST(_req: Request, ctx: RouteContext<"/api/alerts/[id]/re
     signature = await retract(keypair, alert.contentHash);
   } catch (err) {
     console.error(`retract failed for ${alert.id}:`, err);
-    return Response.json({ error: `Retraction transaction failed: ${(err as Error).message}` }, { status: 502 });
+    return Response.json({ error: "The retraction transaction failed. Please try again." }, { status: 502 });
   }
 
   // Only reached after sendAndConfirmTransaction succeeded.

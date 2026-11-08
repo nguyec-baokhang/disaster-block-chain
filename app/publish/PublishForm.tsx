@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CircleCheck, CircleX, FileVideoCamera, LoaderCircle, Send, X } from "lucide-react";
 import AlertCard from "@/components/AlertCard";
+import { MAX_BODY_CHARS, MAX_TITLE_CHARS } from "@/lib/limits";
 import type { Agency, Alert } from "@/lib/types";
 
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
@@ -12,7 +13,7 @@ const inputClass =
   "mt-2 w-full rounded-xl border border-navy-600 bg-navy-900 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 disabled:opacity-60";
 
 function errorMessage(status: number, apiError?: string): string {
-  if (status === 413) return "That video is too large. Please use a clip under 20 MB.";
+  if (status === 413) return apiError ?? "That upload is too large.";
   return apiError ?? `Something went wrong (${status}). Please try again.`;
 }
 
@@ -143,6 +144,7 @@ export default function PublishForm({ agencies }: { agencies: Agency[] }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={loading}
+          maxLength={MAX_TITLE_CHARS}
           placeholder="Boil Water Advisory"
           className={inputClass}
         />
@@ -158,6 +160,7 @@ export default function PublishForm({ agencies }: { agencies: Agency[] }) {
           onChange={(e) => setBody(e.target.value)}
           disabled={loading}
           rows={6}
+          maxLength={MAX_BODY_CHARS}
           placeholder="Residents of Green Township should boil tap water for 1 minute before drinking until further notice."
           className={`${inputClass} resize-y`}
         />
