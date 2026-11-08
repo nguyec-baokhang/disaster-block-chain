@@ -40,17 +40,18 @@ test("buildEvidenceView", async (t) => {
     c("CK-12", "2026-11-08T12:00:00.000Z", "CONTRADICTED", { mediaHash: "m" }), // later
   ];
   const similar = [
-    { check: c("CK-04", "2026-11-08T04:00:00.000Z", "CONTRADICTED", { chainStatus: "confirmed", chainSignature: "s" }), similarity: 0.81 },
+    { check: c("CK-04", "2026-11-08T04:00:00.000Z", "CONTRADICTED", { chainStatus: "confirmed", chainSignature: "s" }), similarity: 0.88 },
     { check: c("CK-05", "2026-11-08T05:00:00.000Z", "VERIFIED_OFFICIAL"), similarity: 0.95 },
-    { check: c("CK-03", "2026-11-08T03:00:00.000Z", "CONTRADICTED"), similarity: 0.77 },
-    { check: c("CK-01", "2026-11-08T01:00:00.000Z", "SUPPORTED"), similarity: 0.6 }, // below 0.75
+    { check: c("CK-03", "2026-11-08T03:00:00.000Z", "CONTRADICTED"), similarity: 0.86 },
+    { check: c("CK-07", "2026-11-08T07:00:00.000Z", "UNVERIFIED"), similarity: 0.8 }, // retrieval-close, but below 0.85
+    { check: c("CK-01", "2026-11-08T01:00:00.000Z", "SUPPORTED"), similarity: 0.6 },
     { check: c("CK-11", "2026-11-08T11:00:00.000Z", "SUPPORTED"), similarity: 0.99 }, // later
   ];
   const view = buildEvidenceView(me, media, similar);
 
   await t.test("exact media: earlier copies only, not itself or later ones", () =>
     assert.deepEqual(view.media, { count: 2, firstSeen: "2026-11-08T02:00:00.000Z" }));
-  await t.test("similar: earlier, >= 0.75, with first seen and most common verdict", () =>
+  await t.test("similar: earlier, >= 0.85 (not the 0.75 retrieval threshold), first seen, most common verdict", () =>
     assert.deepEqual(view.similar, { count: 3, firstSeen: "2026-11-08T03:00:00.000Z", commonVerdict: "CONTRADICTED" }));
   await t.test("top 3: verified evidence first, then same file, then most similar", () => {
     assert.deepEqual(
@@ -61,7 +62,8 @@ test("buildEvidenceView", async (t) => {
         ["CK-06", "media", false, false],
       ],
     );
-    assert.equal(view.top[0].similarity, 0.81);
+    assert.equal(view.top[0].similarity, 0.88);
+    assert.equal(view.top.some((r) => r.id === "CK-07"), false);
   });
   await t.test("nothing earlier → nothing to show", () => {
     const first = c("CK-01", "2026-11-08T00:00:00.000Z");

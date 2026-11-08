@@ -1,7 +1,6 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
 import { connection } from "next/server";
-import { buildEvidenceView } from "@/lib/evidence";
-import { MIN_SIMILARITY } from "@/lib/rag";
+import { EVIDENCE_SIMILARITY, buildEvidenceView } from "@/lib/evidence";
 import { findChecksByMediaHash, getCheck, getEmbedding, similarChecksBefore } from "@/lib/store";
 
 // Public: earlier checks of the same media or a similar claim. Returns ids, verdicts, dates, similarity
@@ -15,7 +14,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/checks/[id]/evi
   const vector = await getEmbedding("check", id).catch(() => undefined);
   const [sameMedia, similar] = await Promise.all([
     check.mediaHash ? findChecksByMediaHash(check.mediaHash) : [],
-    vector ? similarChecksBefore(vector, check.createdAt, MIN_SIMILARITY) : [],
+    vector ? similarChecksBefore(vector, check.createdAt, EVIDENCE_SIMILARITY) : [],
   ]);
   return Response.json(buildEvidenceView(check, sameMedia, similar));
 }

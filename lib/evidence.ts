@@ -1,9 +1,11 @@
 // "Evidence from the ledger" on the result page: what the public ledger already knew about this claim when
 // it was checked. Only earlier checks count, and only public fields leave the server (no text, no users).
-import { MIN_SIMILARITY } from "./rag";
 import type { CheckResult, Verdict } from "./types";
 
 export const EVIDENCE_SHOWN = 3;
+// Stricter than retrieval (0.75, which only orders alerts and finds candidates): shown and counted as
+// "similar claims" only when it's really the same kind of claim.
+export const EVIDENCE_SIMILARITY = 0.85;
 
 export type RelatedCheck = {
   id: string;
@@ -41,7 +43,7 @@ export function buildEvidenceView(
 ): LedgerEvidenceView {
   const before = (c: CheckResult) => c.id !== check.id && c.createdAt < check.createdAt;
   const media = sameMedia.filter(before);
-  const close = similar.filter((s) => before(s.check) && s.similarity >= MIN_SIMILARITY);
+  const close = similar.filter((s) => before(s.check) && s.similarity >= EVIDENCE_SIMILARITY);
   const trusted = new Set(check.ledgerEvidence ?? []);
 
   const related = new Map<string, RelatedCheck>();

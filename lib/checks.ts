@@ -1,5 +1,6 @@
 // Who ran a check. Owner fields are private: only /my-checks shows them, never public responses.
 import { redact } from "./redact";
+import { filterSources, isFirstPerson } from "./sources";
 import type { CheckResult } from "./types";
 
 export type CheckOwner = { sub?: string; email?: string } | null;
@@ -19,6 +20,9 @@ export function publicCheck(check: CheckResult): CheckResult {
   if (rest.inputText) rest.inputText = redact(rest.inputText);
   if (rest.inputTranscript) rest.inputTranscript = redact(rest.inputTranscript);
   if (rest.extractedText) rest.extractedText = redact(rest.extractedText);
+  // Older checks were saved before these display rules existed.
+  rest.sources = filterSources(rest.sources);
+  rest.limitations = rest.limitations.filter((l) => !isFirstPerson(l));
   return rest;
 }
 

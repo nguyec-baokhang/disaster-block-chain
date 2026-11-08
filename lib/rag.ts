@@ -13,6 +13,7 @@ import { getAgency } from "./agencies";
 import { verifyCheck } from "./check-log";
 import { embed } from "./embed";
 import { readAlertStatus } from "./registry";
+import { filterSources } from "./sources";
 import { findChecksByMediaHash, searchAlertsByVector, searchChecksByVector } from "./store";
 import type { Alert, CheckResult, RegistryStatus } from "./types";
 
@@ -34,7 +35,7 @@ export type EvidenceFacts = {
 export function hasTrustworthyBasis(c: CheckResult): boolean {
   if (c.verdict === "UNVERIFIED") return false;
   if (c.basis === "official_match" || c.basis === "exact_hash") return Boolean(c.matchedAlert?.id);
-  if (c.basis === "web_sources") return c.sources.length > 0;
+  if (c.basis === "web_sources") return filterSources(c.sources).length > 0; // sources we'd actually show
   return false;
 }
 

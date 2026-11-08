@@ -7,6 +7,7 @@ import {
   type GenerateContentResponse,
 } from "@google/genai";
 import { tidyClaims } from "./claims";
+import { filterSources } from "./sources";
 import type { Alert, Source } from "./types";
 
 const TIMEOUT_MS = 25_000;
@@ -319,7 +320,7 @@ Search for credible sources (government agencies, established news outlets) abou
 - "UNVERIFIED": everything else. Not finding news coverage, or a general lack of evidence, is UNVERIFIED, never CONTRADICTED.
 
 Respond with ONLY a JSON object, no markdown, no other text:
-{"verdict": "SUPPORTED | CONTRADICTED | UNVERIFIED", "contradictionBasis": "direct | authoritative_absence | null", "authoritativeSource": "source name or null", "summary": "1-2 plain-English sentences", "redFlags": ["..."], "limitations": ["..."]}`;
+{"verdict": "SUPPORTED | CONTRADICTED | UNVERIFIED", "contradictionBasis": "direct | authoritative_absence | null", "authoritativeSource": "source name or null", "summary": "1-2 plain-English sentences", "redFlags": ["..."]}`;
 
   let res: GenerateContentResponse;
   try {
@@ -343,8 +344,11 @@ Respond with ONLY a JSON object, no markdown, no other text:
   return interpretGrounded(res.text ?? "", groundingSources(res));
 }
 
-// Applies the verdict rules to the model's JSON text. Sources must come from grounding metadata.
-export function interpretGrounded(responseText: string, sources: Source[]): GroundedResult {
+// Applies the verdict rules to the model's JSON text. Sources must come from grounding metadata; they're
+// filtered first (no social/video platforms, one per domain, max 6), so the rules below only count sources
+// we actually show. Limitations are only our own standard lines, never Gemini's prose.
+export function interpretGrounded(responseText: string, groundingSources: Source[]): GroundedResult {
+  const sources = filterSources(groundingSources);
   let raw: Record<string, unknown>;
   try {
     const text = responseText.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
@@ -359,7 +363,7 @@ export function interpretGrounded(responseText: string, sources: Source[]): Grou
     };
   }
 
-  const limitations = strings(raw.limitations);
+  const limitations: string[] = [];
   let verdict: GroundedResult["verdict"] =
     raw.verdict === "SUPPORTED" || raw.verdict === "CONTRADICTED" ? raw.verdict : "UNVERIFIED";
   let summary = typeof raw.summary === "string" ? raw.summary : "";
@@ -382,7 +386,11 @@ export function interpretGrounded(responseText: string, sources: Source[]): Grou
   if (sources.length === 0 && verdict !== "UNVERIFIED") {
     verdict = "UNVERIFIED";
     summary = "We found no credible sources we can show you for this claim.";
-    limitations.push("The search returned no citable sources, so this can't be confirmed or refuted.");
+    limitations.push(
+      groundingSources.length > 0
+        ? "The only sources found were social media or video platforms, so this can't be confirmed or refuted."
+        : "The search returned no citable sources, so this can't be confirmed or refuted.",
+    );
   }
 
   return { verdict, summary, redFlags: strings(raw.redFlags), limitations, sources };
