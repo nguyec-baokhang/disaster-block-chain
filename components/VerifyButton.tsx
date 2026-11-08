@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CircleCheck, CircleX, LoaderCircle, ShieldCheck } from "lucide-react";
+import RegistryStatusBadge from "@/components/RegistryStatusBadge";
 import type { VerifyResult } from "@/lib/types";
 
 type State =
@@ -48,7 +49,8 @@ export default function VerifyButton({ alertId }: { alertId: string }) {
 }
 
 function VerifyOutcome({ result }: { result: VerifyResult }) {
-  const intact = result.hashMatches && result.signerIsKnownAgency;
+  // agencyActive is only set for Anchor records; memo records have no on-chain agency account.
+  const intact = result.hashMatches && result.signerIsKnownAgency && result.agencyActive !== false;
   return (
     <div
       role="status"
@@ -62,6 +64,21 @@ function VerifyOutcome({ result }: { result: VerifyResult }) {
       </p>
       {!intact && result.hashMatches && !result.signerIsKnownAgency && (
         <p className="mt-1 text-red-200">The on-chain signer is not the agency this alert claims to be from.</p>
+      )}
+      {result.hashMatches && result.signerIsKnownAgency && result.agencyActive === false && (
+        <p className="mt-1 text-red-200">This agency is not registered as active in the on-chain registry.</p>
+      )}
+      {result.registryStatus && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-slate-300">
+          <span>On-chain status:</span>
+          <RegistryStatusBadge status={result.registryStatus} />
+        </div>
+      )}
+      {result.registryStatus === "Retracted" && (
+        <p className="mt-1 text-red-200">The agency withdrew this alert. Don&apos;t act on it.</p>
+      )}
+      {result.registryStatus === "Superseded" && (
+        <p className="mt-1 text-amber-200">The agency replaced this alert with a newer one.</p>
       )}
       <dl className="mt-3 space-y-2 font-mono text-xs">
         <div>

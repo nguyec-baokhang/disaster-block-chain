@@ -1,0 +1,725 @@
+{
+  "address": "82xaA9hPGxDtdT98EZGTjyjyt1HQaM81nm5MFCzF94hz",
+  "metadata": {
+    "name": "crisis_registry",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "CrisisSignal on-chain alert registry"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "publish_alert",
+      "discriminator": [
+        159,
+        211,
+        118,
+        110,
+        43,
+        83,
+        44,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "agency",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "alert",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  101,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "alert_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "register_agency",
+      "discriminator": [
+        102,
+        193,
+        24,
+        185,
+        91,
+        84,
+        85,
+        245
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agency",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "registry"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "retract_alert",
+      "discriminator": [
+        27,
+        217,
+        66,
+        232,
+        46,
+        129,
+        16,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "alert",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  101,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "alert.content_hash",
+                "account": "Alert"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "alert"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "supersede_alert",
+      "discriminator": [
+        129,
+        209,
+        217,
+        104,
+        21,
+        21,
+        233,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "alert",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  101,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "alert.content_hash",
+                "account": "Alert"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_alert",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  101,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "new_alert.content_hash",
+                "account": "Alert"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "alert",
+            "new_alert"
+          ]
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Agency",
+      "discriminator": [
+        190,
+        253,
+        179,
+        184,
+        231,
+        128,
+        71,
+        112
+      ]
+    },
+    {
+      "name": "Alert",
+      "discriminator": [
+        222,
+        249,
+        201,
+        72,
+        250,
+        104,
+        125,
+        1
+      ]
+    },
+    {
+      "name": "Registry",
+      "discriminator": [
+        47,
+        174,
+        110,
+        246,
+        184,
+        182,
+        252,
+        218
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AgencyRegistered",
+      "discriminator": [
+        5,
+        236,
+        30,
+        187,
+        211,
+        118,
+        185,
+        67
+      ]
+    },
+    {
+      "name": "AlertPublished",
+      "discriminator": [
+        237,
+        65,
+        18,
+        232,
+        215,
+        201,
+        113,
+        186
+      ]
+    },
+    {
+      "name": "AlertRetracted",
+      "discriminator": [
+        30,
+        128,
+        192,
+        134,
+        249,
+        230,
+        32,
+        224
+      ]
+    },
+    {
+      "name": "AlertSuperseded",
+      "discriminator": [
+        224,
+        2,
+        118,
+        86,
+        95,
+        174,
+        59,
+        132
+      ]
+    },
+    {
+      "name": "RegistryInitialized",
+      "discriminator": [
+        144,
+        138,
+        62,
+        105,
+        58,
+        38,
+        100,
+        177
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Signer is not authorized for this action"
+    },
+    {
+      "code": 6001,
+      "name": "NameEmpty",
+      "msg": "Agency name must not be empty"
+    },
+    {
+      "code": 6002,
+      "name": "NameTooLong",
+      "msg": "Agency name exceeds 64 bytes"
+    },
+    {
+      "code": 6003,
+      "name": "AlertIdEmpty",
+      "msg": "Alert ID must not be empty"
+    },
+    {
+      "code": 6004,
+      "name": "AlertIdTooLong",
+      "msg": "Alert ID exceeds 16 bytes"
+    },
+    {
+      "code": 6005,
+      "name": "AgencyInactive",
+      "msg": "Agency is not active"
+    },
+    {
+      "code": 6006,
+      "name": "AlertNotActive",
+      "msg": "Alert is not active"
+    },
+    {
+      "code": 6007,
+      "name": "NewAlertNotActive",
+      "msg": "Replacement alert is not active"
+    },
+    {
+      "code": 6008,
+      "name": "AgencyMismatch",
+      "msg": "Replacement alert belongs to a different agency"
+    },
+    {
+      "code": 6009,
+      "name": "CannotSupersedeWithSelf",
+      "msg": "An alert cannot supersede itself"
+    }
+  ],
+  "types": [
+    {
+      "name": "Agency",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgencyRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agency",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Alert",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "alert_id",
+            "type": "string"
+          },
+          {
+            "name": "issued_at",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "AlertStatus"
+              }
+            }
+          },
+          {
+            "name": "superseded_by",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AlertPublished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "alert",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "alert_id",
+            "type": "string"
+          },
+          {
+            "name": "issued_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AlertRetracted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "alert",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "retracted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AlertStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Retracted"
+          },
+          {
+            "name": "Superseded"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AlertSuperseded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "alert",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_alert",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "superseded_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Registry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RegistryInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}

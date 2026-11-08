@@ -1,6 +1,7 @@
 // Server-only: signs with agency keypairs. Do not import from client components.
 import { getAgency, getAgencyKeypair } from "./agencies";
 import { contentHash } from "./hash";
+import { publishAlert as registryPublish, registryMode } from "./registry";
 import { explorerUrl, recordMemo } from "./solana";
 import { createAlert, saveAlert } from "./store";
 import type { Alert } from "./types";
@@ -21,7 +22,8 @@ export class PublishError extends Error {
   }
 }
 
-// Saves the alert as pending, records its hash on Solana, then saves it as confirmed or failed.
+// Saves the alert as pending, records its hash on Solana (memo or Anchor registry, per REGISTRY_MODE),
+// then saves it as confirmed or failed.
 // Throws PublishError for an unknown agency or missing keypair (nothing is saved then).
 export async function publishAlert(input: PublishInput): Promise<Alert> {
   const { agencyId, title, body, mediaHash, transcript, sourceUrl } = input;
@@ -36,6 +38,7 @@ export async function publishAlert(input: PublishInput): Promise<Alert> {
     throw new PublishError((err as Error).message, 500);
   }
 
+  const mode = registryMode();
   const issuedAt = new Date().toISOString();
   const pending = await createAlert((id) => ({
     id,
@@ -51,14 +54,20 @@ export async function publishAlert(input: PublishInput): Promise<Alert> {
     explorerUrl: null,
     issuedAt,
     ...(sourceUrl && { sourceUrl }),
+    chainRecord: mode,
   }));
 
   let alert: Alert;
   try {
-    const signature = await recordMemo(keypair, `crisissignal:v1:${pending.id}:${pending.contentHash}`);
-    alert = { ...pending, signature, chainStatus: "confirmed", explorerUrl: explorerUrl(signature) };
+    if (mode === "anchor") {
+      const { signature } = await registryPublish(keypair, pending.contentHash, pending.id);
+      alert = { ...pending, signature, chainStatus: "confirmed", explorerUrl: explorerUrl(signature), registryStatus: "Active" };
+    } else {
+      const signature = await recordMemo(keypair, `crisissignal:v1:${pending.id}:${pending.contentHash}`);
+      alert = { ...pending, signature, chainStatus: "confirmed", explorerUrl: explorerUrl(signature) };
+    }
   } catch (err) {
-    console.error(`recordMemo failed for ${pending.id}:`, err);
+    console.error(`${mode} publish failed for ${pending.id}:`, err);
     alert = { ...pending, signature: null, chainStatus: "failed", explorerUrl: null };
   }
 

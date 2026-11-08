@@ -10,7 +10,7 @@ import { createMemoInstruction } from "@solana/spl-memo";
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 let connection: Connection | null = null;
-function getConnection(): Connection {
+export function getConnection(): Connection {
   // Devnet only — refuse anything else rather than spend real SOL.
   if (!RPC_URL.includes("devnet")) throw new Error(`Refusing non-Devnet RPC: ${RPC_URL}`);
   connection ??= new Connection(RPC_URL, "confirmed");

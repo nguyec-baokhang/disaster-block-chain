@@ -1,5 +1,6 @@
 import { CircleX, Clock, Link2 } from "lucide-react";
 import ExplorerLink from "@/components/ExplorerLink";
+import RegistryStatusBadge from "@/components/RegistryStatusBadge";
 import SourceUrlLink from "@/components/SourceUrlLink";
 import VerifyButton from "@/components/VerifyButton";
 import type { Alert } from "@/lib/types";
@@ -19,10 +20,13 @@ export default function AlertCard({ alert, preview = true }: { alert: Alert; pre
     <article className="rounded-xl border border-navy-700 bg-navy-900 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-slate-300">{alert.agencyName}</p>
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.className}`}>
-          <StatusIcon className="h-3.5 w-3.5" aria-hidden />
-          {status.label}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {recorded && alert.registryStatus && <RegistryStatusBadge status={alert.registryStatus} />}
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.className}`}>
+            <StatusIcon className="h-3.5 w-3.5" aria-hidden />
+            {status.label}
+          </span>
+        </div>
       </div>
 
       <h3 className="mt-2 text-lg font-semibold text-slate-50">{alert.title}</h3>

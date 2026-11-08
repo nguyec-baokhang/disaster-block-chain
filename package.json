@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@google/genai": "^3.0.0",
     "@solana/spl-memo": "^0.3.1",
     "@solana/web3.js": "^1.99.0",

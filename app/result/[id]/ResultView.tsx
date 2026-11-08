@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { Flag, Info, Link2, LoaderCircle, RotateCcw } from "lucide-react";
 import DiffList from "@/components/DiffList";
 import ExplorerLink from "@/components/ExplorerLink";
+import RegistryStatusBadge from "@/components/RegistryStatusBadge";
 import SourceList from "@/components/SourceList";
 import SourceUrlLink from "@/components/SourceUrlLink";
 import VerdictBadge from "@/components/VerdictBadge";
@@ -141,6 +142,7 @@ function OfficialPanel({ alert }: { alert: Alert }) {
               <Link2 className="h-4 w-4" aria-hidden />
               Signed on Solana
             </span>
+            {alert.registryStatus && <RegistryStatusBadge status={alert.registryStatus} />}
             <ExplorerLink url={alert.explorerUrl} />
           </p>
         )}

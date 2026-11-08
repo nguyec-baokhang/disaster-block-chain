@@ -1,5 +1,8 @@
 export type Agency = { id: string; name: string; pubkey: string };
 
+export type ChainRecord = "memo" | "anchor";
+export type RegistryStatus = "Active" | "Retracted" | "Superseded";
+
 export type Alert = {
   id: string;                 // "AL-001"
   agencyId: string;
@@ -14,6 +17,8 @@ export type Alert = {
   explorerUrl: string | null;
   issuedAt: string;           // ISO
   sourceUrl?: string;         // original source, e.g. a weather.gov alert (not part of contentHash)
+  chainRecord?: ChainRecord;  // how contentHash was recorded; absent = "memo"
+  registryStatus?: RegistryStatus; // anchor only: last on-chain status seen (verify reads the live one)
 };
 
 export type Verdict = "VERIFIED_OFFICIAL" | "CONTRADICTED" | "SUPPORTED" | "UNVERIFIED";
@@ -45,4 +50,8 @@ export type VerifyResult = {
   signerIsKnownAgency: boolean;
   agencyName?: string;
   explorerUrl: string | null;
+  chainRecord?: ChainRecord;
+  registryStatus?: RegistryStatus | null; // anchor only: live on-chain status, null if no Alert PDA
+  supersededBy?: string | null;           // anchor only: replacement Alert PDA address
+  agencyActive?: boolean;                 // anchor only: Agency PDA exists and is active
 };
