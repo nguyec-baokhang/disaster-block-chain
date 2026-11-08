@@ -226,11 +226,15 @@ ${input}
 
 Search for credible sources (government agencies, established news outlets) about the claims in the message.
 - "SUPPORTED": credible sources confirm the main claim.
-- "CONTRADICTED": credible sources directly contradict the main claim.
-- "UNVERIFIED": you found nothing credible either way. Lack of evidence is UNVERIFIED, never CONTRADICTED.
+- "CONTRADICTED": ONLY in one of these two cases:
+  1. "direct": a credible source directly states the opposite of the main claim.
+  2. "authoritative_absence": an authoritative source that would definitely have a record of this event has none.
+     Examples: USGS for earthquakes, the National Weather Service for weather warnings, an agency's own official
+     site for that agency's announcements. Set authoritativeSource to that source's name and name it in the summary.
+- "UNVERIFIED": everything else. Not finding news coverage, or a general lack of evidence, is UNVERIFIED, never CONTRADICTED.
 
 Respond with ONLY a JSON object, no markdown, no other text:
-{"verdict": "SUPPORTED | CONTRADICTED | UNVERIFIED", "summary": "1-2 plain-English sentences", "redFlags": ["..."], "limitations": ["..."]}`;
+{"verdict": "SUPPORTED | CONTRADICTED | UNVERIFIED", "contradictionBasis": "direct | authoritative_absence | null", "authoritativeSource": "source name or null", "summary": "1-2 plain-English sentences", "redFlags": ["..."], "limitations": ["..."]}`;
 
   let res: GenerateContentResponse;
   try {
@@ -271,6 +275,20 @@ Respond with ONLY a JSON object, no markdown, no other text:
   let verdict: GroundedResult["verdict"] =
     raw.verdict === "SUPPORTED" || raw.verdict === "CONTRADICTED" ? raw.verdict : "UNVERIFIED";
   let summary = typeof raw.summary === "string" ? raw.summary : "";
+
+  // CONTRADICTED needs a direct contradiction, or a named authoritative source with no record.
+  if (verdict === "CONTRADICTED") {
+    const authority = typeof raw.authoritativeSource === "string" ? raw.authoritativeSource.trim() : "";
+    if (raw.contradictionBasis === "authoritative_absence" && authority && authority.toLowerCase() !== "null") {
+      if (!summary.toLowerCase().includes(authority.toLowerCase())) {
+        summary = `${summary} ${authority} has no record of this.`.trim();
+      }
+    } else if (raw.contradictionBasis !== "direct") {
+      verdict = "UNVERIFIED";
+      summary = "We couldn't find a credible source that confirms or directly contradicts this claim.";
+      limitations.push("No source directly contradicted this, and lack of evidence alone isn't proof it's false.");
+    }
+  }
 
   // No grounding chunks means no evidence we can show, so no SUPPORTED/CONTRADICTED.
   if (sources.length === 0 && verdict !== "UNVERIFIED") {
