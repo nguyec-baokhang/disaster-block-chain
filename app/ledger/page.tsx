@@ -29,8 +29,8 @@ export default function LedgerPage({ searchParams }: PageProps<"/ledger">) {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">Public Fake-Claim Ledger</h1>
       <p className="mt-2 text-slate-300">
-        Every claim people have checked, newest first, so you can see what&apos;s already been debunked. No names or emails are
-        shown.
+        Every claim people have checked, newest first. Names and emails are never shown. Logged-in users also see their own
+        checks in My checks.
       </p>
       <Suspense
         fallback={

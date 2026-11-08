@@ -29,7 +29,8 @@ async function CheckGate() {
       loginNote={
         auth0 && (
           <p className="mt-2 text-sm text-slate-400">
-            Your check will be added to the public ledger to protect others. Your email is never shown.
+            Your check will be added to the public Fake-Claim Ledger to protect others (your name and email are never shown) and
+            saved to My checks so you can find it later.
           </p>
         )
       }

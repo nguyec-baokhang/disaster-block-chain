@@ -17,7 +17,8 @@ import { tidyClaims } from "@/lib/claims";
 import { loadThumbnail } from "@/lib/thumbnail";
 import type { Alert, CheckResult } from "@/lib/types";
 
-type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; check: CheckResult };
+type OwnedCheck = CheckResult & { mine?: boolean };
+type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; check: OwnedCheck };
 
 export default function ResultView() {
   const { id } = useParams<{ id: string }>();
@@ -29,7 +30,7 @@ export default function ResultView() {
       .then(async (res) => {
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(res.status === 404 ? "We couldn't find that result." : (data?.error ?? `Error ${res.status}`));
-        if (!cancelled) setState({ status: "done", check: data as CheckResult });
+        if (!cancelled) setState({ status: "done", check: data as OwnedCheck });
       })
       .catch((err) => {
         if (!cancelled) setState({ status: "error", message: (err as Error).message });
@@ -47,7 +48,7 @@ export default function ResultView() {
     const t = setInterval(async () => {
       if (++tries > 15) return clearInterval(t);
       const res = await fetch(`/api/checks/${encodeURIComponent(id)}`, { cache: "no-store" }).catch(() => null);
-      const data = (await res?.json().catch(() => null)) as CheckResult | null;
+      const data = (await res?.json().catch(() => null)) as OwnedCheck | null;
       if (res?.ok && data && data.chainStatus !== "pending") {
         clearInterval(t);
         setState({ status: "done", check: data });
@@ -82,6 +83,7 @@ export default function ResultView() {
     <div className="mx-auto max-w-5xl space-y-10 px-4 py-10 sm:py-14">
       <section className="space-y-4">
         <VerdictBadge verdict={check.verdict} />
+        {check.mine && <p className="text-sm text-slate-400">Saved to My checks · Public on the Ledger (anonymous)</p>}
         {check.summary && <p className="max-w-3xl text-lg text-slate-200">{check.summary}</p>}
         <CheckChainLog id={check.id} chainStatus={check.chainStatus} chainSignature={check.chainSignature} />
       </section>

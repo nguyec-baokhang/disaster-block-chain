@@ -12,7 +12,7 @@ export default function MyChecksPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">My checks</h1>
-      <p className="mt-2 text-slate-300">Messages and videos you checked while logged in. Only you can see this list.</p>
+      <p className="mt-2 text-slate-300">Your own checks. Each one is also on the public Ledger anonymously — only you can see that you made it.</p>
       <Suspense
         fallback={
           <p className="mt-8 flex items-center gap-2 text-slate-300">
