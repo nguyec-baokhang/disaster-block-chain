@@ -2,11 +2,11 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { ChevronRight, FileVideoCamera, ImageIcon, Link as LinkIcon, LoaderCircle, ScrollText, Type } from "lucide-react";
+import { ChevronRight, FileVideoCamera, History, ImageIcon, Link as LinkIcon, LoaderCircle, ScrollText, Type } from "lucide-react";
 import CheckChainLog from "@/components/CheckChainLog";
 import VerdictBadge from "@/components/VerdictBadge";
-import { LEDGER_LIMIT, LEDGER_TYPES, LEDGER_VERDICTS, parseLedgerFilters, toLedgerEntry, type LedgerFilters } from "@/lib/ledger";
-import { listChecks } from "@/lib/store";
+import { LEDGER_LIMIT, LEDGER_TYPES, LEDGER_VERDICTS, parseLedgerFilters, toLedgerEntry, withSeenCounts, type LedgerFilters } from "@/lib/ledger";
+import { claimClusterSizes, listChecks } from "@/lib/store";
 import type { CheckResult, Verdict } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Public Fake-Claim Ledger · CrisisSignal" };
@@ -50,7 +50,9 @@ async function Ledger({ searchParams }: { searchParams: PageProps<"/ledger">["se
   await connection();
   const filters = parseLedgerFilters(await searchParams);
   // Project to public entries here, on the server: the full check (with owner fields) never reaches the page.
-  const entries = (await listChecks(filters)).map(toLedgerEntry);
+  const projected = (await listChecks(filters)).map(toLedgerEntry);
+  const sizes = await claimClusterSizes(projected.map((e) => e.claimId).filter((id): id is string => Boolean(id))).catch(() => new Map<string, number>());
+  const entries = withSeenCounts(projected, sizes);
 
   return (
     <>
@@ -81,6 +83,15 @@ async function Ledger({ searchParams }: { searchParams: PageProps<"/ledger">["se
                       <time dateTime={e.createdAt} suppressHydrationWarning>
                         {new Date(e.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
                       </time>
+                      {e.seenCount && (
+                        <>
+                          <span className="text-slate-600">·</span>
+                          <span className="inline-flex items-center gap-1 text-slate-300">
+                            <History className="h-3.5 w-3.5" aria-hidden />
+                            seen {e.seenCount} times
+                          </span>
+                        </>
+                      )}
                     </div>
                     <p className="mt-2 line-clamp-2 break-words text-sm text-slate-200">{e.preview}</p>
                   </div>

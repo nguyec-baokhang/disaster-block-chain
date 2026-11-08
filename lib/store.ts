@@ -212,7 +212,31 @@ export async function searchChecksByVector(vector: number[], k: number, minSimil
     .map((r) => ({ ...r, check: byId.get(r.id)! }));
 }
 
-export async function findChecksByMediaHash(mediaHash: string): Promise<CheckResult[]> {
-  if (dbEnabled()) return pg.findChecksByMediaHash(mediaHash);
-  return (await readJson<CheckResult>(CHECKS_FILE)).filter((c) => c.mediaHash === mediaHash);
+export async function findChecksByMediaHash(mediaHash: string, limit = 200): Promise<CheckResult[]> {
+  if (dbEnabled()) return pg.findChecksByMediaHash(mediaHash, limit);
+  return (await readJson<CheckResult>(CHECKS_FILE))
+    .filter((c) => c.mediaHash === mediaHash)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+}
+
+// Every check created before `before` with similarity >= minSimilarity (capped), most similar first.
+export async function similarChecksBefore(vector: number[], before: string, minSimilarity: number, limit = 200) {
+  if (dbEnabled()) return pg.similarChecksBefore(vector, before, minSimilarity, limit);
+  const [{ checks: vectors }, checks] = await Promise.all([readEmbeddings(), readJson<CheckResult>(CHECKS_FILE)]);
+  const earlier = new Map(checks.filter((c) => c.createdAt < before).map((c) => [c.id, c]));
+  return rankByCosine(vector, Object.entries(vectors).filter(([id]) => earlier.has(id)).map(([id, v]) => ({ id, vector: v })), limit, minSimilarity)
+    .map((r) => ({ check: earlier.get(r.id)!, similarity: r.similarity }));
+}
+
+// How many checks belong to each claim cluster.
+export async function claimClusterSizes(claimIds: string[]): Promise<Map<string, number>> {
+  const ids = [...new Set(claimIds)];
+  if (ids.length === 0) return new Map();
+  if (dbEnabled()) return pg.claimClusterSizes(ids);
+  const counts = new Map<string, number>();
+  for (const c of await readJson<CheckResult>(CHECKS_FILE)) {
+    if (c.claimId && ids.includes(c.claimId)) counts.set(c.claimId, (counts.get(c.claimId) ?? 0) + 1);
+  }
+  return counts;
 }

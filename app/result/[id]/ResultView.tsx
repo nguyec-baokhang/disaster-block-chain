@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FileVideoCamera, Flag, History, ImageIcon, Info, Link2, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
+import { FileVideoCamera, Flag, ImageIcon, Info, Link2, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
 import CheckChainLog from "@/components/CheckChainLog";
+import LedgerEvidence from "@/components/LedgerEvidence";
 import DiffList from "@/components/DiffList";
 import ExplorerLink from "@/components/ExplorerLink";
 import RegistryStatusBadge from "@/components/RegistryStatusBadge";
@@ -83,8 +84,9 @@ export default function ResultView() {
         <VerdictBadge verdict={check.verdict} />
         {check.summary && <p className="max-w-3xl text-lg text-slate-200">{check.summary}</p>}
         <CheckChainLog id={check.id} chainStatus={check.chainStatus} chainSignature={check.chainSignature} />
-        <LedgerMemory check={check} />
       </section>
+
+      <LedgerEvidence check={check} />
 
       {check.matchedAlert ? (
         <>
@@ -141,32 +143,6 @@ export default function ResultView() {
 
       <CheckAnother />
     </div>
-  );
-}
-
-// What retrieval found on the public ledger. Context only: it never decided the verdict.
-function LedgerMemory({ check }: { check: CheckResult }) {
-  const seen = check.seenBefore ?? 0;
-  const evidence = check.ledgerEvidence ?? [];
-  if (seen === 0) return null;
-  return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400">
-      <History className="h-4 w-4" aria-hidden />
-      Similar claims were checked {seen} {seen === 1 ? "time" : "times"} before.
-      {evidence.length > 0 && (
-        <span>
-          Verified on-chain ledger evidence:{" "}
-          {evidence.map((id, i) => (
-            <span key={id}>
-              {i > 0 && ", "}
-              <Link href={`/result/${encodeURIComponent(id)}`} className="text-sky-300 hover:text-sky-200 hover:underline">
-                {id}
-              </Link>
-            </span>
-          ))}
-        </span>
-      )}
-    </p>
   );
 }
 

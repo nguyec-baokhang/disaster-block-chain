@@ -17,6 +17,8 @@ export type LedgerEntry = {
   createdAt: string;
   chainStatus?: CheckResult["chainStatus"];
   chainSignature?: string; // public tx id of the hash-only log memo
+  claimId?: string; // claim cluster (a check id)
+  seenCount?: number; // checks in that cluster, when more than one
 };
 
 export type LedgerFilters = { verdict?: Verdict; type?: CheckResult["inputType"] };
@@ -61,6 +63,7 @@ export function toLedgerEntry(c: CheckResult): LedgerEntry {
   const entry: LedgerEntry = { id: c.id, verdict: c.verdict, inputType: c.inputType, preview: previewOf(c), createdAt: c.createdAt };
   if (c.chainStatus) entry.chainStatus = c.chainStatus;
   if (c.chainStatus === "confirmed" && c.chainSignature) entry.chainSignature = c.chainSignature;
+  if (c.claimId) entry.claimId = c.claimId;
   return entry;
 }
 
@@ -70,4 +73,12 @@ export function filterChecks(checks: CheckResult[], filters: LedgerFilters, limi
     .filter((c) => (!filters.verdict || c.verdict === filters.verdict) && (!filters.type || c.inputType === filters.type))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit);
+}
+
+// "seen N times": cluster sizes from the store, shown only when a claim was checked more than once.
+export function withSeenCounts(entries: LedgerEntry[], sizes: ReadonlyMap<string, number>): LedgerEntry[] {
+  return entries.map((e) => {
+    const n = e.claimId ? (sizes.get(e.claimId) ?? 0) : 0;
+    return n > 1 ? { ...e, seenCount: n } : e;
+  });
 }

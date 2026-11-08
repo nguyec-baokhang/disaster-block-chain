@@ -6,7 +6,7 @@ import { getAgency } from "@/lib/agencies";
 import { anchorCheck, checkLogEnabled } from "@/lib/check-log";
 import { ownerFields, publicCheck } from "@/lib/checks";
 import { embedCheck } from "@/lib/embeddings";
-import { retrieve, type Retrieval } from "@/lib/rag";
+import { orderForMatcher, retrieve, type Retrieval } from "@/lib/rag";
 import { saveEmbedding } from "@/lib/store";
 import { LinkError, fetchPage, validateUrl } from "@/lib/fetch-page";
 import {
@@ -220,8 +220,7 @@ async function checkContent(input: string, ctx: Ctx) {
   const { alerts, deadline } = ctx;
   const rag = await retrieve(input, ctx.mediaHash, alerts);
   ctx.rag = rag;
-  // Retrieved alerts when retrieval found any; otherwise every official alert, as before.
-  const candidates = rag.alerts.length > 0 ? rag.alerts : alerts;
+  const candidates = orderForMatcher(rag.alerts, alerts);
 
   let match: MatchResult;
   const fallbackLimitations: string[] = [];

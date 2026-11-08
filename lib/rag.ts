@@ -76,6 +76,15 @@ export function claimIdFor(candidates: Candidate[]): string | null {
   return hit ? (hit.check.claimId ?? hit.check.id) : null;
 }
 
+// Every official alert goes to the matcher, the retrieved (most similar) ones first. Retrieval only orders
+// them; it never hides one, so a heavily reworded claim can still be matched (recall safety).
+export function orderForMatcher(retrieved: Alert[], all: Alert[]): Alert[] {
+  const eligible = new Set(all.map((a) => a.id));
+  const first = retrieved.filter((a) => eligible.has(a.id));
+  const firstIds = new Set(first.map((a) => a.id));
+  return [...first, ...all.filter((a) => !firstIds.has(a.id))];
+}
+
 // ---------- I/O ----------
 
 function withTimeout<T>(p: Promise<T>, fallback: T): Promise<T> {
@@ -121,7 +130,7 @@ export type Retrieval = {
 export async function retrieve(claim: string, mediaHash: string | undefined, eligible: Alert[]): Promise<Retrieval> {
   const empty: Retrieval = { vector: null, alerts: [], evidence: [], seen: 0, claimId: null };
   try {
-    const [vector, sameMedia] = await Promise.all([embed(claim), mediaHash ? findChecksByMediaHash(mediaHash) : []]);
+    const [vector, sameMedia] = await Promise.all([embed(claim), mediaHash ? findChecksByMediaHash(mediaHash, 10) : []]);
     const [alertHits, checkHits] = vector
       ? await Promise.all([searchAlertsByVector(vector, TOP_K, MIN_SIMILARITY), searchChecksByVector(vector, TOP_K, MIN_SIMILARITY)])
       : [[], []];

@@ -138,10 +138,28 @@ export async function searchChecksByVector(vector: number[], k: number, minSimil
   return rows.filter((r) => r.similarity >= minSimilarity).map((r) => ({ id: r.id, similarity: r.similarity, check: r.data }));
 }
 
-export async function findChecksByMediaHash(mediaHash: string): Promise<CheckResult[]> {
+export async function findChecksByMediaHash(mediaHash: string, limit: number): Promise<CheckResult[]> {
   const { rows } = await getPool().query<{ data: CheckResult }>(
-    `SELECT data FROM checks WHERE data->>'mediaHash' = $1 ORDER BY created_at DESC LIMIT 20`,
-    [mediaHash],
+    `SELECT data FROM checks WHERE data->>'mediaHash' = $1 ORDER BY created_at DESC LIMIT $2`,
+    [mediaHash, limit],
   );
   return rows.map((r) => r.data);
+}
+
+export async function similarChecksBefore(vector: number[], before: string, minSimilarity: number, limit: number) {
+  const { rows } = await getPool().query<{ data: CheckResult; similarity: number }>(
+    `SELECT data, 1 - (embedding <=> $1::vector) AS similarity FROM checks
+     WHERE embedding IS NOT NULL AND created_at < $2 AND 1 - (embedding <=> $1::vector) >= $3
+     ORDER BY embedding <=> $1::vector LIMIT $4`,
+    [toVectorLiteral(vector), before, minSimilarity, limit],
+  );
+  return rows.map((r) => ({ check: r.data, similarity: r.similarity }));
+}
+
+export async function claimClusterSizes(claimIds: string[]): Promise<Map<string, number>> {
+  const { rows } = await getPool().query<{ claim_id: string; n: number }>(
+    `SELECT data->>'claimId' AS claim_id, count(*)::int AS n FROM checks WHERE data->>'claimId' = ANY($1) GROUP BY 1`,
+    [claimIds],
+  );
+  return new Map(rows.map((r) => [r.claim_id, r.n]));
 }

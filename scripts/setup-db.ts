@@ -6,7 +6,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { SCHEMA_SQL, ensureVectorSchema, getPool } from "../lib/db";
 import { alertEmbeddingText, checkEmbeddingText, embed } from "../lib/embed";
-import { toVectorLiteral } from "../lib/vector";
+import { SAME_CLAIM_SIMILARITY } from "../lib/rag";
+import { cosineSimilarity, toVectorLiteral } from "../lib/vector";
 import type { Alert, CheckResult } from "../lib/types";
 
 async function readJson<T>(name: string): Promise<T[]> {
@@ -81,6 +82,29 @@ async function main() {
     }
     console.log(`Embeddings for ${table}: ${done} added, ${skipped} skipped (no text or embedding failed).`);
   }
+
+  // Claim clusters for checks saved before clustering existed: oldest first, join the first earlier check of
+  // the same media file or a near-identical claim, else start a cluster. Rows that have a claimId are kept.
+  const { rows: all } = await pool.query<{ id: string; data: CheckResult; embedding: string | null }>(
+    `SELECT DISTINCT ON (id) id, data, embedding::text AS embedding FROM checks ORDER BY id, created_at`,
+  );
+  all.sort((a, b) => a.data.createdAt.localeCompare(b.data.createdAt));
+  const seen: { id: string; claimId: string; mediaHash?: string; vector: number[] | null }[] = [];
+  let clustered = 0;
+  for (const r of all) {
+    const vector = r.embedding ? (JSON.parse(r.embedding) as number[]) : null;
+    let claimId = r.data.claimId;
+    if (!claimId) {
+      const same =
+        seen.find((s) => r.data.mediaHash && s.mediaHash === r.data.mediaHash) ??
+        (vector ? seen.find((s) => s.vector && cosineSimilarity(vector, s.vector) >= SAME_CLAIM_SIMILARITY) : undefined);
+      claimId = same?.claimId ?? r.id;
+      await pool.query(`UPDATE checks SET data = jsonb_set(data, '{claimId}', to_jsonb($2::text)) WHERE id = $1`, [r.id, claimId]);
+      clustered++;
+    }
+    seen.push({ id: r.id, claimId, mediaHash: r.data.mediaHash, vector });
+  }
+  console.log(`Claim clusters: ${clustered} checks assigned, ${new Set(seen.map((s) => s.claimId)).size} clusters in total.`);
 
   await pool.end();
 }
