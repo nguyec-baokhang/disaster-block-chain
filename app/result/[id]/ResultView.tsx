@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Flag, Info, Link2, LoaderCircle, RotateCcw } from "lucide-react";
+import { FileVideoCamera, Flag, ImageIcon, Info, Link2, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
 import DiffList from "@/components/DiffList";
 import ExplorerLink from "@/components/ExplorerLink";
 import RegistryStatusBadge from "@/components/RegistryStatusBadge";
@@ -11,6 +11,7 @@ import SourceList from "@/components/SourceList";
 import SourceUrlLink from "@/components/SourceUrlLink";
 import VerdictBadge from "@/components/VerdictBadge";
 import VerifyButton from "@/components/VerifyButton";
+import { loadThumbnail } from "@/lib/thumbnail";
 import type { Alert, CheckResult } from "@/lib/types";
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; check: CheckResult };
@@ -56,7 +57,6 @@ export default function ResultView() {
   }
 
   const { check } = state;
-  const seen = check.inputText ?? check.inputTranscript ?? "";
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 px-4 py-10 sm:py-14">
@@ -68,8 +68,8 @@ export default function ResultView() {
       {check.matchedAlert ? (
         <>
           <section aria-label="Comparison" className="grid gap-4 md:grid-cols-2">
-            <Panel title={check.inputType === "video" ? "What you saw (transcript)" : "What you saw"}>
-              <p className="whitespace-pre-wrap text-slate-200">{seen}</p>
+            <Panel title="What you saw">
+              <WhatYouSaw check={check} />
             </Panel>
             <OfficialPanel alert={check.matchedAlert} />
           </section>
@@ -81,8 +81,8 @@ export default function ResultView() {
           )}
         </>
       ) : (
-        <Panel title={check.inputType === "video" ? "What you checked (transcript)" : "What you checked"}>
-          <p className="whitespace-pre-wrap text-slate-200">{seen}</p>
+        <Panel title="What you checked">
+          <WhatYouSaw check={check} />
         </Panel>
       )}
 
@@ -121,6 +121,75 @@ export default function ResultView() {
       <CheckAnother />
     </div>
   );
+}
+
+// The source (text, link, screenshot or video), then what Gemini extracted from it: that is what was compared.
+function WhatYouSaw({ check }: { check: CheckResult }) {
+  if (check.inputType === "text") return <p className="whitespace-pre-wrap text-slate-200">{check.inputText}</p>;
+  const extracted = check.extractedText ?? check.inputTranscript ?? "";
+  return (
+    <div className="space-y-4">
+      {check.inputType === "link" && check.sourceUrl && <LinkSource url={check.sourceUrl} title={check.sourceTitle} />}
+      {check.inputType === "image" && <ImageSource checkId={check.id} />}
+      {check.inputType === "video" && (
+        <p className="flex items-center gap-2 text-slate-200">
+          <FileVideoCamera className="h-4 w-4 text-sky-400" aria-hidden />
+          Video
+        </p>
+      )}
+      {extracted && (
+        <div className="rounded-lg border border-navy-600 bg-navy-800/60 p-4">
+          <h3 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-400">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            {check.inputType === "video" ? "What Gemini extracted (transcript)" : "What Gemini extracted"}
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-200">{extracted}</p>
+          <p className="mt-2 text-xs text-slate-400">This is what was compared against official alerts.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LinkSource({ url, title }: { url: string; title?: string }) {
+  let safe: URL | null = null;
+  try {
+    const u = new URL(url);
+    if (u.protocol === "http:" || u.protocol === "https:") safe = u;
+  } catch {}
+  return (
+    <div className="min-w-0">
+      {title && <p className="font-medium text-slate-50">{title}</p>}
+      {safe ? (
+        <a
+          href={safe.href}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="mt-1 inline-flex max-w-full items-center gap-1.5 break-all text-sm text-sky-300 hover:text-sky-200 hover:underline"
+        >
+          <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {safe.href}
+        </a>
+      ) : (
+        <p className="mt-1 break-all text-sm text-slate-300">{url}</p>
+      )}
+    </div>
+  );
+}
+
+// The screenshot itself isn't stored; the thumbnail only exists in the browser tab that uploaded it.
+function ImageSource({ checkId }: { checkId: string }) {
+  const [thumb] = useState(() => (typeof window === "undefined" ? null : loadThumbnail(checkId)));
+  if (!thumb) {
+    return (
+      <p className="flex items-center gap-2 text-slate-200">
+        <ImageIcon className="h-4 w-4 text-sky-400" aria-hidden />
+        Screenshot
+      </p>
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element -- a local data: URL thumbnail
+  return <img src={thumb} alt="The screenshot you checked" className="max-h-72 rounded-lg border border-navy-600 object-contain" />;
 }
 
 function OfficialPanel({ alert }: { alert: Alert }) {

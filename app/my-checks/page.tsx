@@ -67,8 +67,8 @@ async function CheckList() {
                 </span>
               </div>
               <p className="mt-2 line-clamp-2 text-sm text-slate-300">
-                {c.inputType === "video" ? "Video: " : ""}
-                {c.inputText ?? c.inputTranscript ?? c.summary}
+                {{ text: "", link: "Link: ", image: "Screenshot: ", video: "Video: " }[c.inputType]}
+                {c.inputType === "link" ? (c.sourceTitle ?? c.sourceUrl) : (c.inputText ?? c.extractedText ?? c.inputTranscript ?? c.summary)}
               </p>
             </div>
             <ChevronRight className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />

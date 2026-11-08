@@ -27,9 +27,12 @@ export type Source = { title: string; uri: string };
 
 export type CheckResult = {
   id: string;                 // "CK-001"
-  inputType: "text" | "video";
+  inputType: "text" | "link" | "image" | "video";
   inputText?: string;
   inputTranscript?: string;
+  sourceUrl?: string;         // link checks: the final URL that was read
+  sourceTitle?: string;       // link checks: the page title
+  extractedText?: string;     // link/image checks: the claims Gemini extracted, which is what was checked
   verdict: Verdict;
   basis: "exact_hash" | "official_match" | "web_sources" | "none";
   summary: string;            // 1–2 plain-English sentences

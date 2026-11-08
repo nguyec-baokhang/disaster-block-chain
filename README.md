@@ -97,7 +97,7 @@ demo/           demo inputs, see demo/README.md
 | POST | `/api/alerts/[id]/retry` | Re-send the on-chain record (memo or registry) for an alert whose transaction failed |
 | POST | `/api/alerts/[id]/retract` | Agency retracts an Anchor-registry alert (demo: server signs with the agency key) |
 | GET | `/api/alerts/[id]/verify` | Integrity check against the chain |
-| POST | `/api/check` | Check a message (multipart: `text` or `video`) |
+| POST | `/api/check` | Check one input (multipart: `text`, `url`, `image` or `video`). Links are fetched SSRF-safe (public IPs only, 10 s, 2 MB, 3 redirects); for links and screenshots Gemini extracts the claims and those are what get checked |
 | GET | `/api/checks/[id]` | One check result |
 | POST | `/api/nws/import` | Import live NWS alerts |
 | GET | `/api/stats` | Check totals per verdict, plus hourly counts per verdict over the last 24h (`time_bucket()` on Tiger Data) |
