@@ -1,7 +1,8 @@
 // Server-only: Postgres implementation of lib/store.ts. Same behavior as the JSON store.
 import { getPool } from "./db";
+import { toVectorLiteral } from "./vector";
 import type { LedgerFilters } from "./ledger";
-import type { CheckStats } from "./store";
+import type { CheckStats, EmbeddingKind } from "./store";
 import type { Alert, CheckResult, Verdict } from "./types";
 
 // "AL-001" style IDs from a sequence, so concurrent requests never share one.
@@ -100,4 +101,20 @@ export async function getCheckStats(): Promise<CheckStats> {
     byVerdict,
     hourly: hourly.rows.map((r) => ({ bucket: r.bucket.toISOString(), verdict: r.verdict, count: r.count })),
   };
+}
+
+// Embeddings: the vector(768) column added by scripts/setup-db.ts.
+
+const EMBED_TABLE = { alert: "alerts", check: "checks" } as const;
+
+export async function saveEmbedding(kind: EmbeddingKind, id: string, vector: number[]): Promise<void> {
+  await getPool().query(`UPDATE ${EMBED_TABLE[kind]} SET embedding = $2::vector WHERE id = $1`, [id, toVectorLiteral(vector)]);
+}
+
+export async function getEmbedding(kind: EmbeddingKind, id: string): Promise<number[] | undefined> {
+  const { rows } = await getPool().query<{ embedding: string | null }>(
+    `SELECT embedding::text AS embedding FROM ${EMBED_TABLE[kind]} WHERE id = $1 LIMIT 1`,
+    [id],
+  );
+  return rows[0]?.embedding ? (JSON.parse(rows[0].embedding) as number[]) : undefined;
 }

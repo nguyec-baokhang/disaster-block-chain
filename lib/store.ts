@@ -10,6 +10,7 @@ import type { Alert, CheckResult, Verdict } from "./types";
 const DATA_DIR = path.join(process.cwd(), "data");
 const ALERTS_FILE = path.join(DATA_DIR, "alerts.json");
 const CHECKS_FILE = path.join(DATA_DIR, "checks.json");
+const EMBEDDINGS_FILE = path.join(DATA_DIR, "embeddings.json");
 
 async function readJson<T>(file: string): Promise<T[]> {
   try {
@@ -157,4 +158,36 @@ export function computeCheckStats(checks: Pick<CheckResult, "verdict" | "created
   }
   const hourly = [...buckets.values()].sort((a, b) => a.bucket.localeCompare(b.bucket) || a.verdict.localeCompare(b.verdict));
   return { total: checks.length, byVerdict, hourly };
+}
+
+// Embeddings (kept apart from alerts/checks so API responses never carry 768 floats)
+
+export type EmbeddingKind = "alert" | "check";
+type EmbeddingFile = { alerts: Record<string, number[]>; checks: Record<string, number[]> };
+
+async function readEmbeddings(): Promise<EmbeddingFile> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(EMBEDDINGS_FILE, "utf8")) as Partial<EmbeddingFile>;
+    return { alerts: parsed.alerts ?? {}, checks: parsed.checks ?? {} };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { alerts: {}, checks: {} };
+    throw err;
+  }
+}
+
+export function saveEmbedding(kind: EmbeddingKind, id: string, vector: number[]): Promise<void> {
+  if (dbEnabled()) return pg.saveEmbedding(kind, id, vector);
+  return locked(async () => {
+    const all = await readEmbeddings();
+    all[kind === "alert" ? "alerts" : "checks"][id] = vector;
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const tmp = `${EMBEDDINGS_FILE}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(all), "utf8");
+    await fs.rename(tmp, EMBEDDINGS_FILE);
+  });
+}
+
+export async function getEmbedding(kind: EmbeddingKind, id: string): Promise<number[] | undefined> {
+  if (dbEnabled()) return pg.getEmbedding(kind, id);
+  return (await readEmbeddings())[kind === "alert" ? "alerts" : "checks"][id];
 }

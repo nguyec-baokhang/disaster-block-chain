@@ -4,6 +4,7 @@ import { getAgency, getAgencyKeypair } from "./agencies";
 import { contentHash } from "./hash";
 import { publishAlert as registryPublish, registryMode } from "./registry";
 import { explorerUrl, recordMemo } from "./solana";
+import { embedAlert } from "./embeddings";
 import { createAlert, getAlert, saveAlert } from "./store";
 import type { Alert } from "./types";
 import { isLocallyIntact } from "./verify";
@@ -59,7 +60,9 @@ export async function publishAlert(input: PublishInput): Promise<Alert> {
     chainRecord: mode,
   }));
 
-  return signAndSave(pending, keypair);
+  // Embed while the transaction confirms; a failed embedding never blocks publishing.
+  const [saved] = await Promise.all([signAndSave(pending, keypair), embedAlert(pending)]);
+  return saved;
 }
 
 const retrying = new Set<string>();

@@ -40,6 +40,7 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 |---|---|
 | `GEMINI_API_KEY` | Gemini API key |
 | `GEMINI_MODEL` | Model for grounded search; needs Search grounding quota |
+| `GEMINI_EMBED_MODEL` | Optional embedding model, default `gemini-embedding-001` (768 dims). Alerts are embedded on publish/import and checks after they're saved; failures are skipped |
 | `GEMINI_MATCH_MODEL` | Optional model for video transcription and alert matching; defaults to `GEMINI_MODEL` |
 | `SOLANA_RPC_URL` | Devnet RPC (the app refuses non-Devnet URLs) |
 | `AGENCY_*_SECRET` | Base58 secret keys for the demo agencies, printed by the setup script |
@@ -64,7 +65,7 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 | `npm test` | Unit tests (hashing, integrity verification, verdict rules) |
 | `npm run lint` | ESLint |
 | `npx tsx --env-file=.env.local scripts/setup-registry.ts` | One-time Anchor registry setup: fund admin, initialize, register both agencies (safe to re-run) |
-| `npx tsx --env-file=.env.local scripts/setup-db.ts` | Create the Tiger Data tables (`checks` is a hypertable) and import `data/*.json` (safe to re-run) |
+| `npx tsx --env-file=.env.local scripts/setup-db.ts` | Create the Tiger Data tables (`checks` is a hypertable), import `data/*.json`, add pgvector `embedding vector(768)` columns with a diskann index (pgvectorscale) or HNSW, and backfill missing embeddings (safe to re-run) |
 | `npx tsx --env-file=.env.local scripts/import-nws.ts` | Mirror up to 3 live weather.gov alerts, signed by the NWS demo wallet |
 | `npx tsx --env-file=.env.local scripts/diag-grounding.ts` | Debug Gemini Search grounding |
 

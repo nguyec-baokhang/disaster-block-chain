@@ -5,6 +5,7 @@ import { getAuth0User } from "@/lib/admin-auth";
 import { getAgency } from "@/lib/agencies";
 import { anchorCheck, checkLogEnabled } from "@/lib/check-log";
 import { ownerFields, publicCheck } from "@/lib/checks";
+import { embedCheck } from "@/lib/embeddings";
 import { LinkError, fetchPage, validateUrl } from "@/lib/fetch-page";
 import {
   GeminiBudgetError,
@@ -124,7 +125,8 @@ export async function POST(request: Request) {
     createdAt: new Date().toISOString(),
     ...(logged ? { chainStatus: "pending" as const } : {}),
   }));
-  // Log the verdict on Solana after the response is sent, so it never slows the check down.
+  // After the response is sent, so neither slows the check down: embed the claim, log the verdict on Solana.
+  after(() => embedCheck(check));
   if (logged) after(() => anchorCheck(check.id));
   return Response.json(publicCheck(check), { status: 201 });
 }

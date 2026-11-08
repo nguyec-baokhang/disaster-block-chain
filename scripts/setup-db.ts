@@ -1,9 +1,12 @@
-// Creates the Tiger Data tables (checks as a TimescaleDB hypertable) and imports data/*.json.
+// Creates the Tiger Data tables (checks as a TimescaleDB hypertable), imports data/*.json, adds pgvector
+// embedding columns + index, and backfills missing embeddings with Gemini.
 // Safe to re-run: existing rows are left alone and the ID sequences only move forward.
 // Usage: npx tsx --env-file=.env.local scripts/setup-db.ts
 import { promises as fs } from "fs";
 import path from "path";
-import { SCHEMA_SQL, getPool } from "../lib/db";
+import { SCHEMA_SQL, ensureVectorSchema, getPool } from "../lib/db";
+import { alertEmbeddingText, checkEmbeddingText, embed } from "../lib/embed";
+import { toVectorLiteral } from "../lib/vector";
 import type { Alert, CheckResult } from "../lib/types";
 
 async function readJson<T>(name: string): Promise<T[]> {
@@ -54,6 +57,29 @@ async function main() {
     const max = rows.reduce((m, r) => Math.max(m, idNumber(r.id)), 0);
     if (max > 0) await pool.query(`SELECT setval('${sequence}', GREATEST($1::bigint, (SELECT last_value FROM ${sequence})))`, [max]);
     console.log(`${sequence}: next ID after ${max}`);
+  }
+
+  const { vectorscale, indexes } = await ensureVectorSchema(pool);
+  console.log(`Vectors: pgvector ready, vectorscale ${vectorscale ? "on" : "off"}, index alerts=${indexes.alerts} checks=${indexes.checks}.`);
+
+  // Backfill only rows still missing an embedding, so re-runs just pick up what failed before.
+  for (const table of ["alerts", "checks"] as const) {
+    const { rows } = await pool.query<{ id: string; data: Alert & CheckResult }>(
+      `SELECT DISTINCT ON (id) id, data FROM ${table} WHERE embedding IS NULL ORDER BY id`,
+    );
+    let done = 0;
+    let skipped = 0;
+    for (const r of rows) {
+      const text = table === "alerts" ? alertEmbeddingText(r.data) : checkEmbeddingText(r.data);
+      const vector = await embed(text);
+      if (!vector) {
+        skipped++;
+        continue;
+      }
+      await pool.query(`UPDATE ${table} SET embedding = $2::vector WHERE id = $1`, [r.id, toVectorLiteral(vector)]);
+      done++;
+    }
+    console.log(`Embeddings for ${table}: ${done} added, ${skipped} skipped (no text or embedding failed).`);
   }
 
   await pool.end();

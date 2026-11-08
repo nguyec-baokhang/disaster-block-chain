@@ -1,6 +1,7 @@
 // Server-only: Tiger Data (Postgres + TimescaleDB) connection. Used by lib/store.ts when DATABASE_URL is set.
 import { readFileSync } from "fs";
 import { Pool } from "pg";
+import { EMBED_DIMENSIONS } from "./vector";
 
 export function dbEnabled(): boolean {
   return Boolean(process.env.DATABASE_URL);
@@ -48,3 +49,41 @@ CREATE INDEX IF NOT EXISTS checks_user_idx ON checks ((data->>'userId'), created
 CREATE SEQUENCE IF NOT EXISTS alert_id_seq;
 CREATE SEQUENCE IF NOT EXISTS check_id_seq;
 `;
+
+// pgvector columns + an ANN index on each table. Prefers pgvectorscale's diskann index, falls back to
+// pgvector's HNSW when the extension (or diskann on a hypertable) isn't available. Idempotent.
+export async function ensureVectorSchema(pool: Pool): Promise<{ vectorscale: boolean; indexes: Record<string, string> }> {
+  await pool.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+  let vectorscale = false;
+  try {
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS vectorscale CASCADE`);
+    vectorscale = true;
+  } catch (err) {
+    console.warn("vectorscale not available, using HNSW:", (err as Error).message);
+  }
+
+  const indexes: Record<string, string> = {};
+  for (const table of ["alerts", "checks"]) {
+    await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS embedding vector(${EMBED_DIMENSIONS})`);
+    const { rows } = await pool.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes WHERE tablename = $1 AND indexname = $2`,
+      [table, `${table}_embedding_idx`],
+    );
+    if (rows[0]) {
+      indexes[table] = /diskann/i.test(rows[0].indexdef) ? "diskann" : "hnsw";
+      continue;
+    }
+    if (vectorscale) {
+      try {
+        await pool.query(`CREATE INDEX ${table}_embedding_idx ON ${table} USING diskann (embedding vector_cosine_ops)`);
+        indexes[table] = "diskann";
+        continue;
+      } catch (err) {
+        console.warn(`diskann index on ${table} failed, using HNSW:`, (err as Error).message);
+      }
+    }
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${table}_embedding_idx ON ${table} USING hnsw (embedding vector_cosine_ops)`);
+    indexes[table] = "hnsw";
+  }
+  return { vectorscale, indexes };
+}
