@@ -46,6 +46,8 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 | `REGISTRY_MODE` | `memo` (default) or `anchor`: where new alerts are recorded |
 | `REGISTRY_PROGRAM_ID` | Deployed `crisis_registry` program on Devnet |
 | `REGISTRY_ADMIN_SECRET` | Registry admin key, printed by `setup-registry.ts` (only that script uses it) |
+| `DATABASE_URL` | Optional Tiger Data (Postgres + TimescaleDB) connection string, SSL required. Unset = JSON files in `data/`. Run `setup-db.ts` once after setting it |
+| `DATABASE_CA_CERT` | Path to Tiger Data's CA certificate (PEM, from the Tiger console). Needed because Tiger signs with its own CA and the app always verifies the cert |
 | `ADMIN_PASSWORD` | Password for `/admin/login`; gates `/publish` and the admin API routes (publish, retract, retry, NWS import) |
 
 ### Scripts
@@ -56,6 +58,7 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 | `npm test` | Unit tests (hashing, integrity verification, verdict rules) |
 | `npm run lint` | ESLint |
 | `npx tsx --env-file=.env.local scripts/setup-registry.ts` | One-time Anchor registry setup: fund admin, initialize, register both agencies (safe to re-run) |
+| `npx tsx --env-file=.env.local scripts/setup-db.ts` | Create the Tiger Data tables (`checks` is a hypertable) and import `data/*.json` (safe to re-run) |
 | `npx tsx --env-file=.env.local scripts/import-nws.ts` | Mirror up to 3 live weather.gov alerts, signed by the NWS demo wallet |
 | `npx tsx --env-file=.env.local scripts/diag-grounding.ts` | Debug Gemini Search grounding |
 
@@ -92,6 +95,7 @@ demo/           demo inputs, see demo/README.md
 | POST | `/api/check` | Check a message (multipart: `text` or `video`) |
 | GET | `/api/checks/[id]` | One check result |
 | POST | `/api/nws/import` | Import live NWS alerts |
+| GET | `/api/stats` | Check totals per verdict, plus hourly counts per verdict over the last 24h (`time_bucket()` on Tiger Data) |
 
 Memo format: `crisissignal:v1:<alertId>:<contentHash>`, where `contentHash = sha256(JSON.stringify({ agencyId, title, body, issuedAt, mediaHash }))` with keys in exactly that order.
 

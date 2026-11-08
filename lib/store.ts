@@ -1,7 +1,9 @@
-// Server-only: uses the filesystem. Do not import from client components.
+// Server-only: uses the filesystem, or Postgres when DATABASE_URL is set. Do not import from client components.
 import { promises as fs } from "fs";
 import path from "path";
-import type { Alert, CheckResult } from "./types";
+import { dbEnabled } from "./db";
+import * as pg from "./store-pg";
+import type { Alert, CheckResult, Verdict } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const ALERTS_FILE = path.join(DATA_DIR, "alerts.json");
@@ -44,16 +46,19 @@ function nextId(prefix: string, items: { id: string }[]): string {
 // Alerts
 
 export async function listAlerts(): Promise<Alert[]> {
+  if (dbEnabled()) return pg.listAlerts();
   const alerts = await readJson<Alert>(ALERTS_FILE);
   return alerts.sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
 }
 
 export async function getAlert(id: string): Promise<Alert | undefined> {
+  if (dbEnabled()) return pg.getAlert(id);
   return (await readJson<Alert>(ALERTS_FILE)).find((a) => a.id === id);
 }
 
 // Assigns the next ID and saves in one locked step.
 export function createAlert(make: (id: string) => Alert): Promise<Alert> {
+  if (dbEnabled()) return pg.createAlert(make);
   return locked(async () => {
     const alerts = await readJson<Alert>(ALERTS_FILE);
     const alert = make(nextId("AL", alerts));
@@ -64,6 +69,7 @@ export function createAlert(make: (id: string) => Alert): Promise<Alert> {
 }
 
 export function saveAlert(alert: Alert): Promise<Alert> {
+  if (dbEnabled()) return pg.saveAlert(alert);
   return locked(async () => {
     const alerts = await readJson<Alert>(ALERTS_FILE);
     const i = alerts.findIndex((a) => a.id === alert.id);
@@ -77,11 +83,13 @@ export function saveAlert(alert: Alert): Promise<Alert> {
 // Checks
 
 export async function getCheck(id: string): Promise<CheckResult | undefined> {
+  if (dbEnabled()) return pg.getCheck(id);
   return (await readJson<CheckResult>(CHECKS_FILE)).find((c) => c.id === id);
 }
 
 // Assigns the next ID and saves in one locked step.
 export function createCheck(make: (id: string) => CheckResult): Promise<CheckResult> {
+  if (dbEnabled()) return pg.createCheck(make);
   return locked(async () => {
     const checks = await readJson<CheckResult>(CHECKS_FILE);
     const check = make(nextId("CK", checks));
@@ -89,4 +97,36 @@ export function createCheck(make: (id: string) => CheckResult): Promise<CheckRes
     await writeJson(CHECKS_FILE, checks);
     return check;
   });
+}
+
+// Stats
+
+export type CheckStats = {
+  total: number;
+  byVerdict: Partial<Record<Verdict, number>>;
+  hourly: { bucket: string; verdict: Verdict; count: number }[]; // last 24h, 1-hour buckets
+};
+
+export async function getCheckStats(): Promise<CheckStats> {
+  if (dbEnabled()) return pg.getCheckStats();
+  return computeCheckStats(await readJson<CheckResult>(CHECKS_FILE));
+}
+
+// JSON fallback for the Postgres time_bucket() query in store-pg.ts.
+export function computeCheckStats(checks: Pick<CheckResult, "verdict" | "createdAt">[], now = Date.now()): CheckStats {
+  const HOUR = 60 * 60 * 1000;
+  const byVerdict: Partial<Record<Verdict, number>> = {};
+  const buckets = new Map<string, { bucket: string; verdict: Verdict; count: number }>();
+  for (const c of checks) {
+    byVerdict[c.verdict] = (byVerdict[c.verdict] ?? 0) + 1;
+    const t = Date.parse(c.createdAt);
+    if (!(t > now - 24 * HOUR)) continue;
+    const bucket = new Date(Math.floor(t / HOUR) * HOUR).toISOString();
+    const key = `${bucket} ${c.verdict}`;
+    const b = buckets.get(key) ?? { bucket, verdict: c.verdict, count: 0 };
+    b.count++;
+    buckets.set(key, b);
+  }
+  const hourly = [...buckets.values()].sort((a, b) => a.bucket.localeCompare(b.bucket) || a.verdict.localeCompare(b.verdict));
+  return { total: checks.length, byVerdict, hourly };
 }

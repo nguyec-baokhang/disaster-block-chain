@@ -4,8 +4,9 @@ import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { LoaderCircle, Megaphone, Plus } from "lucide-react";
 import AlertCard from "@/components/AlertCard";
+import LiveStats from "@/components/LiveStats";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin";
-import { listAlerts } from "@/lib/store";
+import { getCheckStats, listAlerts } from "@/lib/store";
 
 export default function AlertsPage() {
   return (
@@ -24,6 +25,10 @@ export default function AlertsPage() {
         </Link>
       </div>
 
+      <Suspense fallback={null}>
+        <Stats />
+      </Suspense>
+
       <Suspense
         fallback={
           <p className="mt-8 flex items-center gap-2 text-slate-300">
@@ -36,6 +41,15 @@ export default function AlertsPage() {
       </Suspense>
     </div>
   );
+}
+
+async function Stats() {
+  await connection(); // live numbers — render at request time
+  const stats = await getCheckStats().catch((err) => {
+    console.error("stats failed:", err);
+    return null; // stats are a nice-to-have; never break the alert list
+  });
+  return stats && <LiveStats stats={stats} />;
 }
 
 async function AlertList() {

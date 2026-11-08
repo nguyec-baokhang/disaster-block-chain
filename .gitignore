@@ -44,3 +44,6 @@ next-env.d.ts
 .env.local
 !.env.example
 data/*.json
+
+# Tiger Data CA certificate (local only)
+config/*.pem
