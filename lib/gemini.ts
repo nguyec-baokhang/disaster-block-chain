@@ -152,7 +152,8 @@ Decide how the submitted message relates to the official alerts:
 
 Rules:
 - matchedAlertId is the id of the matched alert (e.g. "AL-001"), or null when UNRELATED.
-- differences: for ALTERED, one short item per concrete change, formatted "<What> changed: <official> → <message>", e.g. "Instruction changed: boil water → evacuate", "Area changed: Green Township → all of Hamilton County", "Severity changed: advisory → emergency". Keep each item under 15 words and quote only the changed words, never the full official text or the full message. Empty otherwise.
+- differences: for ALTERED, one short item per concrete change, formatted "<What> changed: <official> → <message>", e.g. "Instruction changed: boil water → evacuate", "Location changed: Green Township → all of Hamilton County", "Severity changed: advisory → emergency". Keep each item under 15 words and quote only the changed words, never the full official text or the full message. Empty otherwise.
+- Locations: a place in the message that lies INSIDE the official alert's area is NOT a difference (e.g. Cincinnati is inside "southwest Ohio"; a county is inside the region that contains it). Naming one city in the covered area is just being specific. Only list "Location changed" when the message names a place outside the alert's area, or expands the area beyond what the alert covers.
 - redFlags: manipulation signs in the message (urgency, all caps, emotional language, missing source, requests to forward). Empty if none.
 - summary: 1–2 plain-English sentences for a member of the public.`;
 
