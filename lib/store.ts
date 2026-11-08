@@ -24,6 +24,15 @@ async function writeJson<T>(file: string, items: T[]): Promise<void> {
   await fs.rename(tmp, file);
 }
 
+// Serialize read-modify-write cycles so concurrent requests can't clobber each other
+// or hand out the same ID.
+let queue: Promise<unknown> = Promise.resolve();
+function locked<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn, fn);
+  queue = run.catch(() => {});
+  return run;
+}
+
 function nextId(prefix: string, items: { id: string }[]): string {
   const max = items.reduce((m, { id }) => {
     const n = Number(id.slice(prefix.length + 1));
@@ -43,17 +52,26 @@ export async function getAlert(id: string): Promise<Alert | undefined> {
   return (await readJson<Alert>(ALERTS_FILE)).find((a) => a.id === id);
 }
 
-export async function nextAlertId(): Promise<string> {
-  return nextId("AL", await readJson<Alert>(ALERTS_FILE));
+// Assigns the next ID and saves in one locked step.
+export function createAlert(make: (id: string) => Alert): Promise<Alert> {
+  return locked(async () => {
+    const alerts = await readJson<Alert>(ALERTS_FILE);
+    const alert = make(nextId("AL", alerts));
+    alerts.push(alert);
+    await writeJson(ALERTS_FILE, alerts);
+    return alert;
+  });
 }
 
-export async function saveAlert(alert: Alert): Promise<Alert> {
-  const alerts = await readJson<Alert>(ALERTS_FILE);
-  const i = alerts.findIndex((a) => a.id === alert.id);
-  if (i >= 0) alerts[i] = alert;
-  else alerts.push(alert);
-  await writeJson(ALERTS_FILE, alerts);
-  return alert;
+export function saveAlert(alert: Alert): Promise<Alert> {
+  return locked(async () => {
+    const alerts = await readJson<Alert>(ALERTS_FILE);
+    const i = alerts.findIndex((a) => a.id === alert.id);
+    if (i >= 0) alerts[i] = alert;
+    else alerts.push(alert);
+    await writeJson(ALERTS_FILE, alerts);
+    return alert;
+  });
 }
 
 // Checks
@@ -62,15 +80,13 @@ export async function getCheck(id: string): Promise<CheckResult | undefined> {
   return (await readJson<CheckResult>(CHECKS_FILE)).find((c) => c.id === id);
 }
 
-export async function nextCheckId(): Promise<string> {
-  return nextId("CK", await readJson<CheckResult>(CHECKS_FILE));
-}
-
-export async function saveCheck(check: CheckResult): Promise<CheckResult> {
-  const checks = await readJson<CheckResult>(CHECKS_FILE);
-  const i = checks.findIndex((c) => c.id === check.id);
-  if (i >= 0) checks[i] = check;
-  else checks.push(check);
-  await writeJson(CHECKS_FILE, checks);
-  return check;
+// Assigns the next ID and saves in one locked step.
+export function createCheck(make: (id: string) => CheckResult): Promise<CheckResult> {
+  return locked(async () => {
+    const checks = await readJson<CheckResult>(CHECKS_FILE);
+    const check = make(nextId("CK", checks));
+    checks.push(check);
+    await writeJson(CHECKS_FILE, checks);
+    return check;
+  });
 }
