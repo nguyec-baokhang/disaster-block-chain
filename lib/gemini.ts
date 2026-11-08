@@ -1,18 +1,55 @@
 // Server-only: uses GEMINI_API_KEY. Do not import from client components.
-import { GoogleGenAI, Type, type GenerateContentResponse } from "@google/genai";
+import {
+  ApiError,
+  GoogleGenAI,
+  Type,
+  type GenerateContentParameters,
+  type GenerateContentResponse,
+} from "@google/genai";
 import type { Alert, Source } from "./types";
+
+const TIMEOUT_MS = 25_000;
+const RETRY_DELAY_MS = 1_000;
 
 let ai: GoogleGenAI | null = null;
 function client(): GoogleGenAI {
   if (!process.env.GEMINI_API_KEY) throw new Error("Missing GEMINI_API_KEY in .env.local");
-  ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // SDK retries are off (its default backoff can run for minutes); generate() owns retries.
+  ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { retryOptions: { attempts: 1 } } });
   return ai;
 }
 
-function model(): string {
+// Used only for groundedCheck: it needs a model with Search grounding quota.
+function groundModel(): string {
   const m = process.env.GEMINI_MODEL;
   if (!m) throw new Error("Missing GEMINI_MODEL in .env.local");
   return m;
+}
+
+// Used for transcribeVideo and matchAgainstAlerts (no tools needed).
+function matchModel(): string {
+  return process.env.GEMINI_MATCH_MODEL || groundModel();
+}
+
+// Timeouts, network errors, 408, 429 and 5xx are worth one retry; other 4xx are not.
+function retryable(err: unknown): boolean {
+  if (err instanceof ApiError) return err.status === 408 || err.status === 429 || err.status >= 500;
+  return true;
+}
+
+// Every Gemini call goes through here: 25 s per attempt, at most 1 retry.
+async function generate(params: GenerateContentParameters): Promise<GenerateContentResponse> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await client().models.generateContent({
+        ...params,
+        config: { ...params.config, abortSignal: AbortSignal.timeout(TIMEOUT_MS) },
+      });
+    } catch (err) {
+      if (attempt >= 1 || !retryable(err)) throw err;
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
 }
 
 const strings = (v: unknown): string[] =>
@@ -21,8 +58,8 @@ const strings = (v: unknown): string[] =>
 // ---------- transcribeVideo ----------
 
 export async function transcribeVideo(bytes: Uint8Array, mimeType: string): Promise<string> {
-  const res = await client().models.generateContent({
-    model: model(),
+  const res = await generate({
+    model: matchModel(),
     contents: [
       {
         role: "user",
@@ -94,12 +131,12 @@ Decide how the submitted message relates to the official alerts:
 
 Rules:
 - matchedAlertId is the id of the matched alert (e.g. "AL-001"), or null when UNRELATED.
-- differences: for ALTERED, list each concrete change as "Official: ... / Message: ...". Empty otherwise.
+- differences: for ALTERED, one short item per concrete change, formatted "<What> changed: <official> → <message>", e.g. "Instruction changed: boil water → evacuate", "Area changed: Green Township → all of Hamilton County", "Severity changed: advisory → emergency". Keep each item under 15 words and quote only the changed words, never the full official text or the full message. Empty otherwise.
 - redFlags: manipulation signs in the message (urgency, all caps, emotional language, missing source, requests to forward). Empty if none.
 - summary: 1–2 plain-English sentences for a member of the public.`;
 
-  const res = await client().models.generateContent({
-    model: model(),
+  const res = await generate({
+    model: matchModel(),
     contents: prompt,
     config: { responseMimeType: "application/json", responseSchema: MATCH_SCHEMA },
   });
@@ -118,13 +155,21 @@ Rules:
     return { ...unrelated, redFlags: strings(raw.redFlags) };
   }
 
+  const matched = alerts.find((a) => a.id === matchedAlertId)!;
   return {
     matchedAlertId,
     relation,
-    differences: relation === "ALTERED" ? strings(raw.differences) : [],
+    differences: relation === "ALTERED" ? shortDifferences(strings(raw.differences), [input, matched.body]) : [],
     redFlags: strings(raw.redFlags),
     summary: typeof raw.summary === "string" ? raw.summary : "",
   };
+}
+
+// Drop any item that pastes in a whole text instead of naming the specific change.
+function shortDifferences(items: string[], fullTexts: string[]): string[] {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const texts = fullTexts.map(norm).filter((t) => t.length > 30);
+  return items.filter((item) => !texts.some((t) => norm(item).includes(t)));
 }
 
 // ---------- groundedCheck ----------
@@ -166,11 +211,24 @@ Search for credible sources (government agencies, established news outlets) abou
 Respond with ONLY a JSON object, no markdown, no other text:
 {"verdict": "SUPPORTED | CONTRADICTED | UNVERIFIED", "summary": "1-2 plain-English sentences", "redFlags": ["..."], "limitations": ["..."]}`;
 
-  const res = await client().models.generateContent({
-    model: model(),
-    contents: prompt,
-    config: { tools: [{ googleSearch: {} }] },
-  });
+  let res: GenerateContentResponse;
+  try {
+    res = await generate({
+      model: groundModel(),
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }] },
+    });
+  } catch (err) {
+    // Quota, timeout or outage: degrade to UNVERIFIED (basis "none") instead of failing the check.
+    console.error("groundedCheck failed:", err);
+    return {
+      verdict: "UNVERIFIED",
+      summary: "We couldn't check this against web sources right now.",
+      redFlags: [],
+      limitations: ["Web source check unavailable right now"],
+      sources: [],
+    };
+  }
 
   const sources = groundingSources(res);
 
