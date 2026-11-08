@@ -18,7 +18,7 @@ export default function AlertsPage() {
           className="inline-flex items-center gap-2 rounded-lg border border-navy-600 bg-navy-800 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-navy-700"
         >
           <Plus className="h-4 w-4" aria-hidden />
-          Publish an alert
+          Add or mirror alerts
         </Link>
       </div>
 
