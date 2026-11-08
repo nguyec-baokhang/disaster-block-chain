@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NextRequest } from "next/server";
 import { proxy } from "../proxy";
-import { ADMIN_COOKIE, SESSION_SECONDS, createSessionToken, passwordMatches, requireAdmin, verifySessionToken } from "./admin";
+import { ADMIN_COOKIE, SESSION_SECONDS, createSessionToken, passwordMatches, verifySessionToken } from "./admin";
+import { adminEmails, isAdminUser, requireAdmin } from "./admin-auth";
 
 const PASSWORD = "correct horse";
 const NOW = Date.parse("2026-11-08T06:00:00.000Z");
@@ -52,9 +53,9 @@ test("admin gate", async (t) => {
     { name: "API: valid cookie among others → allowed", cookie: `theme=dark; ${valid}`, want: null },
   ];
   for (const tc of apiCases) {
-    await t.test(tc.name, () => {
+    await t.test(tc.name, async () => {
       const headers = tc.cookie ? { cookie: tc.cookie } : undefined;
-      const res = requireAdmin(new Request("http://localhost/api/alerts", { method: "POST", headers }));
+      const res = await requireAdmin(new Request("http://localhost/api/alerts", { method: "POST", headers }));
       assert.equal(res?.status ?? null, tc.want);
     });
   }
@@ -62,12 +63,47 @@ test("admin gate", async (t) => {
   const pageCases = [
     { name: "/publish: no cookie → redirect to /admin/login", cookie: undefined, wantLocation: "http://localhost/admin/login" },
     { name: "/publish: valid cookie → passes through", cookie: valid, wantLocation: null },
+    { name: "/publish: forged Auth0-looking cookie → redirect", cookie: "__session=forged", wantLocation: "http://localhost/admin/login" },
   ];
+  await t.test("public routes pass through without a cookie", async () => {
+    const res = await proxy(new NextRequest("http://localhost/alerts"));
+    assert.equal(res.headers.get("location"), null);
+  });
   for (const tc of pageCases) {
-    await t.test(tc.name, () => {
+    await t.test(tc.name, async () => {
       const headers = tc.cookie ? { cookie: tc.cookie } : undefined;
-      const res = proxy(new NextRequest("http://localhost/publish", { headers }));
+      const res = await proxy(new NextRequest("http://localhost/publish", { headers }));
       assert.equal(res.headers.get("location"), tc.wantLocation);
     });
   }
+});
+
+test("adminEmails", async (t) => {
+  const testCases = [
+    { name: "splits, trims and lowercases", raw: " Ops@CrisisSignal.org , dev@example.com ", want: ["ops@crisissignal.org", "dev@example.com"] },
+    { name: "drops empty entries", raw: "a@x.org,, ,", want: ["a@x.org"] },
+    { name: "empty → no admins", raw: "", want: [] },
+  ];
+  for (const tc of testCases) {
+    await t.test(tc.name, () => assert.deepEqual(adminEmails(tc.raw), tc.want));
+  }
+});
+
+test("isAdminUser", async (t) => {
+  const list = "ops@crisissignal.org, dev@example.com";
+  const testCases = [
+    { name: "verified email on the list", user: { email: "ops@crisissignal.org", email_verified: true }, want: true },
+    { name: "matches case-insensitively", user: { email: "Dev@Example.COM", email_verified: true }, want: true },
+    { name: "email not on the list", user: { email: "someone@else.org", email_verified: true }, want: false },
+    { name: "unverified email on the list", user: { email: "ops@crisissignal.org", email_verified: false }, want: false },
+    { name: "missing email_verified", user: { email: "ops@crisissignal.org" }, want: false },
+    { name: "no email", user: { email_verified: true }, want: false },
+    { name: "a list entry that is only a substring", user: { email: "ops@crisissignal.org.evil.com", email_verified: true }, want: false },
+    { name: "no user", user: null, want: false },
+  ];
+  for (const tc of testCases) {
+    await t.test(tc.name, () => assert.equal(isAdminUser(tc.user, list), tc.want));
+  }
+  await t.test("empty ADMIN_EMAILS → nobody", () =>
+    assert.equal(isAdminUser({ email: "ops@crisissignal.org", email_verified: true }, ""), false));
 });

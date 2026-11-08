@@ -50,9 +50,3 @@ function cookieValue(header: string | null, name: string): string | undefined {
 export function isAdminRequest(request: Request): boolean {
   return verifySessionToken(cookieValue(request.headers.get("cookie"), ADMIN_COOKIE));
 }
-
-// For admin route handlers: returns a 401 response to send, or null when the caller is an admin.
-export function requireAdmin(request: Request): Response | null {
-  if (isAdminRequest(request)) return null;
-  return Response.json({ error: "Admin login required" }, { status: 401 });
-}

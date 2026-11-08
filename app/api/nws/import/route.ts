@@ -1,10 +1,10 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/admin-auth";
 import { NwsFetchError, importNwsAlerts } from "@/lib/nws";
 import { PublishError } from "@/lib/publish";
 
 export async function POST(request: Request) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   try {
     return Response.json(await importNwsAlerts());

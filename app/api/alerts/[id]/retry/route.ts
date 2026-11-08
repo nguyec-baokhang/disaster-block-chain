@@ -1,9 +1,9 @@
 // No `runtime` export: Cache Components doesn't allow it, and Node.js is the default.
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/admin-auth";
 import { PublishError, retryAlert } from "@/lib/publish";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/alerts/[id]/retry">) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   const { id } = await ctx.params;
   try {

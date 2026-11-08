@@ -1,11 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { LoaderCircle, Megaphone, Plus } from "lucide-react";
 import AlertCard from "@/components/AlertCard";
 import LiveStats from "@/components/LiveStats";
-import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin";
+import { getAdmin } from "@/lib/admin-auth";
 import { getCheckStats, listAlerts } from "@/lib/store";
 
 export default function AlertsPage() {
@@ -55,7 +54,7 @@ async function Stats() {
 async function AlertList() {
   await connection(); // reads local files — render at request time, never prerender
   const alerts = await listAlerts();
-  const admin = verifySessionToken((await cookies()).get(ADMIN_COOKIE)?.value);
+  const admin = (await getAdmin()) !== null;
 
   if (alerts.length === 0) {
     return (

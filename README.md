@@ -49,6 +49,11 @@ The wallets need Devnet SOL to sign memos. If the setup script's airdrop is rate
 | `DATABASE_URL` | Optional Tiger Data (Postgres + TimescaleDB) connection string, SSL required. Unset = JSON files in `data/`. Run `setup-db.ts` once after setting it |
 | `DATABASE_CA_CERT` | Path to Tiger Data's CA certificate (PEM, from the Tiger console). Needed because Tiger signs with its own CA and the app always verifies the cert |
 | `ADMIN_PASSWORD` | Password for `/admin/login`; gates `/publish` and the admin API routes (publish, retract, retry, NWS import) |
+| `AUTH0_DOMAIN` | Optional. Turns on "Log in with Auth0" on `/admin/login`. Unset = password only |
+| `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` | Auth0 Regular Web Application credentials |
+| `AUTH0_SECRET` | Encrypts the Auth0 session cookie (`openssl rand -hex 32`) |
+| `APP_BASE_URL` | App URL, e.g. `http://localhost:3000`. In Auth0, allow `<APP_BASE_URL>/auth/callback` as a callback URL and `<APP_BASE_URL>` as a logout URL |
+| `ADMIN_EMAILS` | Comma-separated admin emails. An Auth0 login is an admin only if its email is verified and on this list |
 
 ### Scripts
 
