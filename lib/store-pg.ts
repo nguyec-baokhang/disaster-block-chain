@@ -1,5 +1,6 @@
 // Server-only: Postgres implementation of lib/store.ts. Same behavior as the JSON store.
 import { getPool } from "./db";
+import type { LedgerFilters } from "./ledger";
 import type { CheckStats } from "./store";
 import type { Alert, CheckResult, Verdict } from "./types";
 
@@ -40,6 +41,17 @@ export async function saveAlert(alert: Alert): Promise<Alert> {
 export async function getCheck(id: string): Promise<CheckResult | undefined> {
   const { rows } = await getPool().query<{ data: CheckResult }>(`SELECT data FROM checks WHERE id = $1 LIMIT 1`, [id]);
   return rows[0]?.data;
+}
+
+export async function listChecks(filters: LedgerFilters, limit: number): Promise<CheckResult[]> {
+  const { rows } = await getPool().query<{ data: CheckResult }>(
+    `SELECT data FROM checks
+     WHERE ($1::text IS NULL OR verdict = $1) AND ($2::text IS NULL OR data->>'inputType' = $2)
+     ORDER BY created_at DESC
+     LIMIT $3`,
+    [filters.verdict ?? null, filters.type ?? null, limit],
+  );
+  return rows.map((r) => r.data);
 }
 
 export async function listChecksByUser(userId: string): Promise<CheckResult[]> {

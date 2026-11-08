@@ -16,6 +16,8 @@ import {
 } from "@/lib/gemini";
 import { sha256 } from "@/lib/hash";
 import { checkExtracted, sniffImageType } from "@/lib/inputs";
+import { auth0 } from "@/lib/auth0";
+import { checkLimiter } from "@/lib/rate-limit";
 import { MAX_CHECK_TEXT_CHARS, MAX_IMAGE_BYTES, imageError } from "@/lib/limits";
 import { alertPda, readAlertStatus } from "@/lib/registry";
 import { createCheck, listAlerts, saveAlert } from "@/lib/store";
@@ -32,6 +34,17 @@ const LINK_FAILED = "Couldn't read that page — paste the text instead.";
 type Draft = Omit<CheckResult, "id" | "createdAt">;
 
 export async function POST(request: Request) {
+  // Checking needs a login (when Auth0 is configured), and each user gets 10 checks a minute.
+  const user = await getAuth0User();
+  if (auth0 && !user?.sub) return Response.json({ error: "Log in to check a claim." }, { status: 401 });
+  const limit = checkLimiter.hit(user?.sub ?? "anonymous");
+  if (!limit.ok) {
+    return Response.json(
+      { error: `You've run 10 checks in the last minute. Try again in ${limit.retryAfterSec} s.` },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSec) } },
+    );
+  }
+
   const deadline = Date.now() + BUDGET_MS;
   let form: FormData;
   try {
@@ -99,8 +112,8 @@ export async function POST(request: Request) {
     return Response.json({ error: `Check failed: ${(err as Error).message}` }, { status: 502 });
   }
 
-  // Login is optional: anonymous checks simply have no owner.
-  const owner = ownerFields(await getAuth0User());
+  // Anonymous only when Auth0 isn't configured at all.
+  const owner = ownerFields(user);
   const check = await createCheck((id) => ({ id, ...draft, ...owner, createdAt: new Date().toISOString() }));
   return Response.json(publicCheck(check), { status: 201 });
 }

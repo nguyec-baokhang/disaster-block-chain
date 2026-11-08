@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { checksForUser } from "./checks";
 import { dbEnabled } from "./db";
+import { LEDGER_LIMIT, filterChecks, type LedgerFilters } from "./ledger";
 import * as pg from "./store-pg";
 import type { Alert, CheckResult, Verdict } from "./types";
 
@@ -86,6 +87,12 @@ export function saveAlert(alert: Alert): Promise<Alert> {
 export async function getCheck(id: string): Promise<CheckResult | undefined> {
   if (dbEnabled()) return pg.getCheck(id);
   return (await readJson<CheckResult>(CHECKS_FILE)).find((c) => c.id === id);
+}
+
+// All checks for the public ledger, newest first. Callers must project with toLedgerEntry before display.
+export async function listChecks(filters: LedgerFilters = {}, limit = LEDGER_LIMIT): Promise<CheckResult[]> {
+  if (dbEnabled()) return pg.listChecks(filters, limit);
+  return filterChecks(await readJson<CheckResult>(CHECKS_FILE), filters, limit);
 }
 
 // A logged-in user's own checks, newest first.

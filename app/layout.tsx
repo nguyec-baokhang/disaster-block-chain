@@ -41,6 +41,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/alerts" className="rounded-md px-3 py-2 text-slate-300 hover:bg-navy-800 hover:text-slate-50">
                 Official Alerts
               </Link>
+              <Link href="/ledger" className="rounded-md px-3 py-2 text-slate-300 hover:bg-navy-800 hover:text-slate-50">
+                Ledger
+              </Link>
               <Suspense fallback={null}>
                 <AccountNav />
               </Suspense>
